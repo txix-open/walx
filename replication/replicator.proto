@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package replication;
+option go_package = "/replication/replicator";
+
+message BeginRequest {
+  uint64 lastIndex = 1;
+}
+
+message Entry {
+  bytes data = 1;
+  uint64 index = 2;
+}
+
+service Replicator {
+  rpc Begin(BeginRequest) returns (stream Entry);
+}
