@@ -32,7 +32,7 @@ func TestReplicationChain(t *testing.T) {
 	cli, err := replication.NewClient(slaveWal, addr)
 	require.NoError(err)
 	go func() {
-		err := cli.RunReplication(context.Background())
+		err := cli.Run(context.Background())
 		require.NoError(err)
 	}()
 	slaveReader := slaveWal.OpenReader(0)
@@ -71,12 +71,12 @@ func dir() string {
 	return hex.EncodeToString(d)
 }
 
-func createWal(t *testing.T, require *require.Assertions) *walx2.Log {
+func createWal(t *testing.T, require *require.Assertions) *walx.Log {
 	dir := dir()
 	t.Cleanup(func() {
 		_ = os.RemoveAll(dir)
 	})
-	wal, err := walx2.Open(dir)
+	wal, err := walx.Open(dir)
 	require.NoError(err)
 	return wal
 }

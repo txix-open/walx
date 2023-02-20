@@ -1,4 +1,4 @@
-package walx2
+package walx
 
 type Entry struct {
 	Data  []byte

@@ -3,7 +3,6 @@ package state_test
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"os"
 	"testing"
@@ -28,7 +27,7 @@ type businessState struct {
 
 func (s *businessState) Apply(log []byte) (any, error) {
 	e := events{}
-	err := json.Unmarshal(log, &e)
+	err := state.UnmarshalEvent(log, &e)
 	if err != nil {
 		return nil, err
 	}
@@ -96,9 +95,9 @@ func dir() string {
 	return hex.EncodeToString(d)
 }
 
-func createWal(dir string, require *require.Assertions) *walx2.Log {
+func createWal(dir string, require *require.Assertions) *walx.Log {
 
-	wal, err := walx2.Open(dir)
+	wal, err := walx.Open(dir)
 	require.NoError(err)
 	return wal
 }

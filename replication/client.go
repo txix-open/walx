@@ -13,7 +13,7 @@ import (
 )
 
 type Wal interface {
-	WriteEntry(entry walx2.Entry) error
+	WriteEntry(entry walx.Entry) error
 	LastIndex() uint64
 }
 
@@ -38,7 +38,7 @@ func NewClient(wal Wal, remoteAddr string) (*Client, error) {
 	}, nil
 }
 
-func (c *Client) RunReplication(ctx context.Context) error {
+func (c *Client) Run(ctx context.Context) error {
 	lastIndex := c.wal.LastIndex()
 	reader, err := c.cli.Begin(ctx, &replicator.BeginRequest{LastIndex: lastIndex})
 	if err != nil {
@@ -53,7 +53,7 @@ func (c *Client) RunReplication(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		err = c.wal.WriteEntry(walx2.Entry{
+		err = c.wal.WriteEntry(walx.Entry{
 			Data:  entry.Data,
 			Index: entry.Index,
 		})

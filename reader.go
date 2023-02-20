@@ -1,4 +1,4 @@
-package walx2
+package walx
 
 import (
 	"errors"

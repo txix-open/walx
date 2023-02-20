@@ -13,7 +13,7 @@ import (
 )
 
 type ReaderSource interface {
-	OpenReader(lastIndex uint64) *walx2.Reader
+	OpenReader(lastIndex uint64) *walx.Reader
 }
 
 type Server struct {

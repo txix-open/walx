@@ -1,4 +1,4 @@
-package walx2_test
+package walx_test
 
 import (
 	"context"
@@ -30,7 +30,7 @@ func TestConcurrent(t *testing.T) {
 	t.Cleanup(func() {
 		_ = os.RemoveAll(dir)
 	})
-	wal, err := walx2.Open(dir)
+	wal, err := walx.Open(dir)
 	require.NoError(err)
 
 	for i := 0; i < readers; i++ {

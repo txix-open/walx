@@ -1,7 +1,7 @@
 package state
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -15,12 +15,12 @@ type FSM interface {
 }
 
 type State struct {
-	*walx2.Log
+	*walx.Log
 	fsm     FSM
 	futures *sync.Map
 }
 
-func New(log *walx2.Log, fsm FSM) *State {
+func New(log *walx.Log, fsm FSM) *State {
 	return &State{
 		Log:     log,
 		fsm:     fsm,
@@ -44,10 +44,10 @@ func (s *State) Recovery() error {
 	return nil
 }
 
-func (s *State) Apply(request any) (any, error) {
-	data, err := json.Marshal(request)
+func (s *State) Apply(event any) (any, error) {
+	data, err := MarshalEvent(event)
 	if err != nil {
-		return nil, fmt.Errorf("json marshal: %w", err)
+		return nil, fmt.Errorf("marshal event: %w", err)
 	}
 
 	future := newFuture()
@@ -61,7 +61,7 @@ func (s *State) Apply(request any) (any, error) {
 	return future.wait()
 }
 
-func (s *State) Run() error {
+func (s *State) Run(ctx context.Context) error {
 	lastIndex := s.Log.LastIndex()
 	reader := s.Log.OpenReader(lastIndex)
 	defer reader.Close()

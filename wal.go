@@ -1,4 +1,4 @@
-package walx2
+package walx
 
 import (
 	"fmt"
@@ -21,6 +21,7 @@ func Open(dir string) (*Log, error) {
 		SegmentCacheSize: 4,
 		SegmentSize:      1 * 1024 * 1024 * 1024 * 1024,
 		NoSync:           true,
+		NoCopy:           false,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("wal open: %w", err)
