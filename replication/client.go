@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"io"
 
+	"gitlab.elocont.ru/integration-system/walx"
+	"gitlab.elocont.ru/integration-system/walx/replication/replicator"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"walx"
-	"walx/replication/replicator"
 )
 
 type Wal interface {

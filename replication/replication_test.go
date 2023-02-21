@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"walx"
-	"walx/replication"
+	"gitlab.elocont.ru/integration-system/walx"
+	"gitlab.elocont.ru/integration-system/walx/replication"
 )
 
 func TestReplicationChain(t *testing.T) {

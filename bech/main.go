@@ -75,7 +75,7 @@ func main() {
 		panic(err)
 	}
 	go func() {
-		err := state.Run()
+		err := state.Run(context.Background())
 		if err != nil {
 			panic(err)
 		}

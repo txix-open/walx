@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/tidwall/wal"
-	"walx"
+	"gitlab.elocont.ru/integration-system/walx"
 )
 
 type FSM interface {

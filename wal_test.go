@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"gitlab.elocont.ru/integration-system/walx"
 	"golang.org/x/sync/errgroup"
-	"walx"
 )
 
 func TestConcurrent(t *testing.T) {

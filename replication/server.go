@@ -7,9 +7,9 @@ import (
 	"net"
 
 	"github.com/tidwall/wal"
+	"gitlab.elocont.ru/integration-system/walx"
+	"gitlab.elocont.ru/integration-system/walx/replication/replicator"
 	"google.golang.org/grpc"
-	"walx"
-	"walx/replication/replicator"
 )
 
 type ReaderSource interface {

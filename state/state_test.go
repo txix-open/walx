@@ -1,6 +1,7 @@
 package state_test
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
@@ -8,8 +9,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"walx"
-	"walx/state"
+	"gitlab.elocont.ru/integration-system/walx"
+	"gitlab.elocont.ru/integration-system/walx/state"
 )
 
 type v struct {
@@ -55,7 +56,7 @@ func TestState(t *testing.T) {
 	s := businessState{}
 	ss := state.New(wal, &s)
 	go func() {
-		err := ss.Run()
+		err := ss.Run(context.Background())
 		require.NoError(err)
 	}()
 
@@ -79,7 +80,7 @@ func TestState(t *testing.T) {
 	require.EqualValues(5, s.value)
 
 	go func() {
-		err := ss.Run()
+		err := ss.Run(context.Background())
 		require.NoError(err)
 	}()
 
@@ -96,7 +97,6 @@ func dir() string {
 }
 
 func createWal(dir string, require *require.Assertions) *walx.Log {
-
 	wal, err := walx.Open(dir)
 	require.NoError(err)
 	return wal
