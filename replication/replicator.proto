@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+//protoc --go_out=. --go-grpc_out=. replication/replicator.proto
+
+package replication;
+option go_package = "/replication/replicator";
+
+message BeginRequest {
+  uint64 lastIndex = 1;
+  repeated string filteredStreams = 2;
+}
+
+message Entry {
+  bytes data = 1;
+  uint64 index = 2;
+}
+
+message WriteRequest {
+  bytes data = 1;
+}
+
+message WriteResponse {
+  uint64 index = 1;
+}
+
+service Replicator {
+  rpc Begin(BeginRequest) returns (stream Entry);
+  rpc DebugWrite(WriteRequest) returns (WriteResponse);
+}
