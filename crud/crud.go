@@ -12,10 +12,10 @@ var (
 	ErrAlreadyExists = errors.New("already exists")
 )
 
-type UpdateHook[T WithId] func(t T, updated bool)
-type InsertHook[T WithId] func(t T, inserted bool)
-type DeleteHook[T WithId] func(t T, deleted bool)
-type UpsertHook[T WithId] func(t T, updated bool)
+type UpdateHook[T WithId] func(t *T, updated bool)
+type InsertHook[T WithId] func(t *T, inserted bool)
+type DeleteHook[T WithId] func(t *T, deleted bool)
+type UpsertHook[T WithId] func(t *T, updated bool)
 type Hooks[T WithId] struct {
 	UpdateHooks []UpdateHook[T]
 	InsertHooks []InsertHook[T]
@@ -40,7 +40,7 @@ type WithId interface {
 
 type State[T WithId] struct {
 	mutator      state.Mutator
-	items        map[string]T
+	items        map[string]*T
 	name         string
 	streamSuffix []byte
 	hooks        Hooks[T]
@@ -53,7 +53,7 @@ func New[T WithId](name string) *State[T] {
 	return &State[T]{
 		name:         name,
 		streamSuffix: []byte(name),
-		items:        map[string]T{},
+		items:        map[string]*T{},
 		readLock:     mu.RLocker(),
 		writeLock:    mu,
 	}
@@ -68,25 +68,25 @@ func (s *State[T]) SetMutator(mutator state.Mutator) {
 }
 
 func (s *State[T]) All() []T {
-	return s.Find(func(elem T) bool {
+	return s.Find(func(elem *T) bool {
 		return true
 	})
 }
 
-func (s *State[T]) Find(filter func(elem T) bool) []T {
+func (s *State[T]) Find(filter func(elem *T) bool) []T {
 	s.readLock.Lock()
 	defer s.readLock.Unlock()
 
-	arr := make([]T, 0, len(s.items))
+	arr := make([]T, 0)
 	for _, item := range s.items {
 		if filter(item) {
-			arr = append(arr, item)
+			arr = append(arr, *item)
 		}
 	}
 	return arr
 }
 
-func (s *State[T]) ForEach(f func(elem T)) {
+func (s *State[T]) ForEach(f func(elem *T)) {
 	s.readLock.Lock()
 	defer s.readLock.Unlock()
 
@@ -99,11 +99,8 @@ func (s *State[T]) Get(id string) *T {
 	s.readLock.Lock()
 	defer s.readLock.Unlock()
 
-	item, ok := s.items[id]
-	if !ok {
-		return nil
-	}
-	return &item
+	item := s.items[id]
+	return item
 }
 
 func (s *State[T]) Upsert(item T) error {
@@ -116,9 +113,9 @@ func (s *State[T]) Upsert(item T) error {
 
 func (s *State[T]) upsert(item T) (any, error) {
 	_, updated := s.items[item.GetId()]
-	s.items[item.GetId()] = item
+	s.items[item.GetId()] = &item
 	for _, hook := range s.hooks.UpsertHooks {
-		hook(item, updated)
+		hook(&item, updated)
 	}
 	return nothing{}, nil
 }
@@ -140,7 +137,7 @@ func (s *State[T]) delete(id string) (any, error) {
 	}()
 	if ok {
 		delete(s.items, id)
-		return item, nil
+		return *item, nil
 	}
 	return nil, ErrNotFound
 }
@@ -158,7 +155,7 @@ func (s *State[T]) DeleteAll() error {
 
 func (s *State[T]) deleteAll() (any, error) {
 	old := s.items
-	s.items = map[string]T{}
+	s.items = map[string]*T{}
 	for _, item := range old {
 		for _, hook := range s.hooks.DeleteHooks {
 			hook(item, true)
@@ -180,13 +177,13 @@ func (s *State[T]) update(item T) (any, error) {
 	_, ok := s.items[id]
 	defer func() {
 		for _, hook := range s.hooks.UpdateHooks {
-			hook(item, ok)
+			hook(&item, ok)
 		}
 	}()
 	if !ok {
 		return nil, ErrNotFound
 	}
-	s.items[id] = item
+	s.items[id] = &item
 	return nothing{}, nil
 }
 
@@ -203,13 +200,13 @@ func (s *State[T]) insert(item T) (any, error) {
 	_, ok := s.items[id]
 	defer func() {
 		for _, hook := range s.hooks.InsertHooks {
-			hook(item, !ok)
+			hook(&item, !ok)
 		}
 	}()
 	if ok {
 		return nil, ErrAlreadyExists
 	}
-	s.items[id] = item
+	s.items[id] = &item
 	return nothing{}, nil
 }
 

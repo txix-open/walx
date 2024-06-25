@@ -26,7 +26,7 @@ func ServeState[T state.BusinessState](t *testing.T, s T) T {
 		err := state.Run(context.Background())
 		require.NoError(err)
 	}()
-	time.Sleep(300 * time.Millisecond)
+	time.Sleep(100 * time.Millisecond)
 	t.Cleanup(func() {
 		err := state.Close()
 		require.NoError(err)
