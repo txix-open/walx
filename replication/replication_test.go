@@ -25,7 +25,7 @@ func TestReplicationChain(t *testing.T) {
 	require.NoError(err)
 
 	masterWal := createWal(t, require)
-	srv := replication.NewServer(masterWal, nil, logger)
+	srv := replication.NewServer(masterWal, logger)
 	lis, addr := listener(require)
 	go func() {
 		err := srv.Serve(lis)

@@ -2,6 +2,7 @@ package replication
 
 import (
 	"context"
+	"google.golang.org/grpc/credentials"
 	"io"
 	"sync/atomic"
 	"time"
@@ -29,7 +30,7 @@ type Client struct {
 	closed          *atomic.Bool
 	filteredStreams []string
 	logger          log.Logger
-	options         *options
+	options         *clientOptions
 
 	grpcCli *grpc.ClientConn
 }
@@ -42,7 +43,7 @@ func NewClient(
 	logger log.Logger,
 	opts ...ClientOption,
 ) *Client {
-	options := newOptions()
+	options := newClientOptions()
 	for _, opt := range opts {
 		opt(options)
 	}
@@ -115,11 +116,18 @@ func (c *Client) begin(ctx context.Context) (replicator.Replicator_BeginClient, 
 	var err error
 	dialCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+	dialOpts := []grpc.DialOption{
+		grpc.WithBlock(),
+	}
+	if c.options.tls != nil {
+		dialOpts = append(dialOpts, grpc.WithTransportCredentials(credentials.NewTLS(c.options.tls)))
+	} else {
+		dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
 	c.grpcCli, err = grpc.DialContext(
 		dialCtx,
 		c.remoteAddr,
-		grpc.WithBlock(),
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		dialOpts...,
 	)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "grpc dial to %s", c.remoteAddr)

@@ -63,9 +63,9 @@ func TestOutOfCache(t *testing.T) {
 		require.NoError(err)
 	}()
 	time.Sleep(300 * time.Millisecond)
-	server := replication.NewServer(masterWal, func() (*walx.Log, error) {
+	server := replication.NewServer(masterWal, logger, replication.ServerOldSegmentOpener(func() (*walx.Log, error) {
 		return walx.Open(mDir, walx.SegmentsCachePolicy(2, 10))
-	}, logger)
+	}))
 	lis, addr := listener(require)
 	go func() {
 		err := server.Serve(lis)
