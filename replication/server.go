@@ -3,6 +3,7 @@ package replication
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/credentials"
 	"io"
 	"net"
 	"runtime"
@@ -19,23 +20,29 @@ const (
 	AllStreams = "*"
 )
 
-type WalOpener func() (*walx.Log, error)
-
 type Server struct {
 	replicator.UnimplementedReplicatorServer
-	hotWal *walx.Log
-	opener WalOpener
-	srv    *grpc.Server
-	logger log.Logger
+	hotWal  *walx.Log
+	srv     *grpc.Server
+	options *serverOptions
+	logger  log.Logger
 }
 
-func NewServer(hotWal *walx.Log, opener WalOpener, log log.Logger) *Server {
-	srv := grpc.NewServer()
+func NewServer(hotWal *walx.Log, log log.Logger, opts ...ServerOption) *Server {
+	options := newServerOptions()
+	for _, opt := range opts {
+		opt(options)
+	}
+	serverOpts := []grpc.ServerOption{}
+	if options.tls != nil {
+		serverOpts = append(serverOpts, grpc.Creds(credentials.NewTLS(options.tls)))
+	}
+	srv := grpc.NewServer(serverOpts...)
 	s := &Server{
-		hotWal: hotWal,
-		opener: opener,
-		srv:    srv,
-		logger: log,
+		hotWal:  hotWal,
+		srv:     srv,
+		options: options,
+		logger:  log,
 	}
 	replicator.RegisterReplicatorServer(srv, s)
 	return s
@@ -147,7 +154,7 @@ func (s *Server) sendColdLogs(ctx context.Context, matcher streamMatcher, index 
 		s.logger.Info(ctx, "stop sending cold logs")
 	}()
 
-	wal, err := s.opener()
+	wal, err := s.options.oldSegmentOpener()
 	if err != nil {
 		return errors.WithMessage(err, "open new wal")
 	}

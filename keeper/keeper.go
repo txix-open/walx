@@ -3,6 +3,7 @@ package keeper
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
@@ -59,15 +60,17 @@ func New(
 	}
 	logger.Info(ctx, "end state recovering")
 
+	serverOptions := slices.Clone(options.replicationServerOptions)
+	serverOptions = append(serverOptions, replication.ServerOldSegmentOpener(func() (*walx.Log, error) {
+		return walx.Open(dir, walx.SegmentsCachePolicy(1, 0))
+	}))
 	return &Keeper{
-		name:          name,
-		state:         ss,
-		businessState: businessState,
-		logger:        logger,
-		replicationServer: replication.NewServer(wal, func() (*walx.Log, error) {
-			return walx.Open(dir, walx.SegmentsCachePolicy(1, 0))
-		}, logger),
-		options: *options,
+		name:              name,
+		state:             ss,
+		businessState:     businessState,
+		logger:            logger,
+		replicationServer: replication.NewServer(wal, logger, serverOptions...),
+		options:           *options,
 	}, nil
 }
 
