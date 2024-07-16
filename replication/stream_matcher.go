@@ -26,7 +26,7 @@ func newStreamMatcher(request *replicator.BeginRequest) streamMatcher {
 	}
 }
 
-func (m streamMatcher) Match(entry *walx.Entry) bool {
+func (m streamMatcher) Match(entry walx.Entry) bool {
 	if m.matchAllStreams {
 		return true
 	}

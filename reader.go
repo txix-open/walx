@@ -37,10 +37,10 @@ func NewReader(unsub func(), index uint64, log ReadOnlyLog) *Reader {
 	}
 }
 
-func (r *Reader) Read() (*Entry, error) {
+func (r *Reader) Read() (Entry, error) {
 	for {
 		if r.closed.Load() {
-			return nil, ErrClosed
+			return Entry{}, ErrClosed
 		}
 
 		index := r.index.Load()
@@ -53,10 +53,13 @@ func (r *Reader) Read() (*Entry, error) {
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("wal read: %w", err)
+			return Entry{}, fmt.Errorf("wal read: %w", err)
 		}
 		r.index.Add(1)
-		return &Entry{Data: data, Index: index}, nil
+		return Entry{
+			Data:  data,
+			Index: index,
+		}, nil
 	}
 }
 
