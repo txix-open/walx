@@ -2,6 +2,7 @@ package replication_test
 
 import (
 	"context"
+	"github.com/txix-open/walx/stream"
 	"os"
 	"sync/atomic"
 	"testing"
@@ -96,7 +97,7 @@ func TestOutOfCache(t *testing.T) {
 		})
 		slaveWal, err := walx.Open(sDir, walx.SegmentsCachePolicy(2, 10))
 		require.NoError(err)
-		cli := replication.NewClient(slaveWal, "test", addr, []string{replication.AllStreams}, logger)
+		cli := replication.NewClient(slaveWal, "test", addr, []string{stream.AllStreams}, logger)
 		go func() {
 			err := cli.Run(context.Background())
 			require.NoError(err)

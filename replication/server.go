@@ -3,6 +3,7 @@ package replication
 import (
 	"context"
 	"fmt"
+	"github.com/txix-open/walx/stream"
 	"google.golang.org/grpc/credentials"
 	"io"
 	"net"
@@ -14,10 +15,6 @@ import (
 	"github.com/txix-open/walx"
 	"github.com/txix-open/walx/replication/replicator"
 	"google.golang.org/grpc"
-)
-
-const (
-	AllStreams = "*"
 )
 
 type Server struct {
@@ -57,7 +54,7 @@ func (s *Server) Begin(request *replicator.BeginRequest, server replicator.Repli
 		log.Any("lastIndex", request.LastIndex),
 		log.Any("filteredStreams", request.FilteredStreams),
 	)
-	matcher := newStreamMatcher(request)
+	matcher := stream.NewMatcher(request.GetFilteredStreams())
 
 	defer func() {
 		s.logger.Info(ctx, "client will be disconnected")
@@ -148,7 +145,7 @@ func (s *Server) Close() error {
 	return nil
 }
 
-func (s *Server) sendColdLogs(ctx context.Context, matcher streamMatcher, index uint64, server replicator.Replicator_BeginServer) error {
+func (s *Server) sendColdLogs(ctx context.Context, matcher stream.Matcher, index uint64, server replicator.Replicator_BeginServer) error {
 	s.logger.Info(ctx, "requested log is out of cache, sending cold logs")
 	defer func() {
 		s.logger.Info(ctx, "stop sending cold logs")
