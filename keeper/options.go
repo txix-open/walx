@@ -3,6 +3,7 @@ package keeper
 import (
 	"github.com/txix-open/walx"
 	"github.com/txix-open/walx/replication"
+	"github.com/txix-open/walx/stream"
 )
 
 type options struct {
@@ -16,7 +17,7 @@ type options struct {
 func newOptions() *options {
 	return &options{
 		serverPort:      0,
-		filteredStreams: []string{replication.AllStreams},
+		filteredStreams: []string{stream.AllStreams},
 		walOptions: []walx.Option{
 			walx.WithHook(metricsHook()),
 		},
