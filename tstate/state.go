@@ -14,18 +14,18 @@ import (
 )
 
 func ServeState[T state.BusinessState](t *testing.T, s T) T {
-	businessState, _ := ServeStateWithState(t, s)
+	businessState, _ := ServeStateWithState(t, s, t.Name())
 	return businessState
 }
 
-func ServeStateWithState[T state.BusinessState](t *testing.T, s T) (T, *state.State) {
+func ServeStateWithState[T state.BusinessState](t *testing.T, s T, stateName string) (T, *state.State) {
 	t.Helper()
 
 	require := require.New(t)
 	dir := dir()
 	log, err := walx.Open(dir)
 	require.NoError(err)
-	state := state.New(log, s, t.Name())
+	state := state.New(log, s, stateName)
 	s.SetMutator(state)
 	go func() {
 		err := state.Run(context.Background())
