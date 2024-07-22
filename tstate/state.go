@@ -14,6 +14,11 @@ import (
 )
 
 func ServeState[T state.BusinessState](t *testing.T, s T) T {
+	businessState, _ := ServeStateWithState(t, s)
+	return businessState
+}
+
+func ServeStateWithState[T state.BusinessState](t *testing.T, s T) (T, *state.State) {
 	t.Helper()
 
 	require := require.New(t)
@@ -33,7 +38,7 @@ func ServeState[T state.BusinessState](t *testing.T, s T) T {
 		err = os.RemoveAll(dir)
 		require.NoError(err)
 	})
-	return s
+	return s, state
 }
 
 func dir() string {
