@@ -163,6 +163,22 @@ func (l *Log) Close() error {
 	return nil
 }
 
+func (l *Log) TruncateFront(newFirstIndex uint64) error {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+
+	err := l.log.TruncateFront(newFirstIndex)
+	if err != nil {
+		return fmt.Errorf("wal front truncate: %w", err)
+	}
+	index, err := l.log.LastIndex()
+	if err != nil {
+		return fmt.Errorf("wal get last index: %w", err)
+	}
+	l.index.Store(index)
+	return nil
+}
+
 func (l *Log) trySync(data []byte) (bool, error) {
 	l.writtenBytes += len(data)
 	if l.writtenBytes < l.fsyncThreshold {
