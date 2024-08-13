@@ -105,5 +105,8 @@ func MatchStream(fullStreamName []byte, primaryStream []byte) bool {
 	if len(fullStreamName) == 0 {
 		return false
 	}
+	if len(primaryStream) == 0 {
+		return true
+	}
 	return bytes.HasPrefix(fullStreamName, primaryStream)
 }
