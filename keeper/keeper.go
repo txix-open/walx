@@ -54,7 +54,7 @@ func New(
 	businessState.SetMutator(ss)
 
 	logger.Info(ctx, "start state recovering")
-	err = ss.Recovery()
+	err = ss.Recovery(ctx)
 	if err != nil {
 		return nil, errors.WithMessagef(err, "recovery state %s", name)
 	}

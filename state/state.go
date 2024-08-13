@@ -39,13 +39,13 @@ func New(log *walx.Log, fsm FSM, primaryStream string) *State {
 	}
 }
 
-func (s *State) Recovery() error {
+func (s *State) Recovery(ctx context.Context) error {
 	reader := s.Log.OpenReader(0)
 	defer reader.Close()
 
 	lastIndex := s.Log.LastIndex()
 	for i := uint64(0); i < lastIndex; i++ {
-		entry, err := reader.Read()
+		entry, err := reader.Read(ctx)
 		if err != nil {
 			return err
 		}
@@ -84,7 +84,7 @@ func (s *State) Run(ctx context.Context) error {
 	defer reader.Close()
 
 	for {
-		entry, err := reader.Read()
+		entry, err := reader.Read(ctx)
 		if errors.Is(err, walx.ErrClosed) {
 			return nil
 		}

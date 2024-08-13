@@ -42,7 +42,7 @@ func TestReplicationChain(t *testing.T) {
 	slaveCounter := &atomic.Int64{}
 	go func() {
 		for {
-			entry, err := slaveReader.Read()
+			entry, err := slaveReader.Read(context.Background())
 			stream, data := state.UnpackEvent(entry.Data)
 			require.EqualValues("test", string(stream))
 			require.NoError(err)

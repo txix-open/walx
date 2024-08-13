@@ -4,15 +4,16 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"github.com/pkg/errors"
-	"github.com/stretchr/testify/require"
-	"github.com/txix-open/isp-kit/log"
-	"github.com/txix-open/walx/replication"
 	"os"
 	"path"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/stretchr/testify/require"
+	"github.com/txix-open/isp-kit/log"
+	"github.com/txix-open/walx/replication"
 )
 
 func TestClientTls(t *testing.T) {
@@ -47,7 +48,7 @@ func TestClientTls(t *testing.T) {
 	counter := &atomic.Int64{}
 	go func() {
 		for {
-			_, err := clientReader.Read()
+			_, err := clientReader.Read(context.Background())
 			require.NoError(err)
 			counter.Add(1)
 		}
