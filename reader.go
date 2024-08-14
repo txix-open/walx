@@ -1,6 +1,7 @@
 package walx
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync/atomic"
@@ -37,7 +38,7 @@ func NewReader(unsub func(), index uint64, log ReadOnlyLog) *Reader {
 	}
 }
 
-func (r *Reader) Read() (Entry, error) {
+func (r *Reader) Read(ctx context.Context) (Entry, error) {
 	for {
 		if r.closed.Load() {
 			return Entry{}, ErrClosed
@@ -49,6 +50,8 @@ func (r *Reader) Read() (Entry, error) {
 			select {
 			case <-r.ch:
 			case <-time.After(waitEntryTimeout):
+			case <-ctx.Done():
+				return Entry{}, ctx.Err()
 			}
 			continue
 		}
