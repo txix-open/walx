@@ -37,7 +37,7 @@ func TestConcurrent(t *testing.T) {
 		reader := wal.OpenReader(0)
 		readersGroup.Go(func() error {
 			for i := 0; i < 10000; i++ {
-				data, err := reader.Read()
+				data, err := reader.Read(ctx)
 				if err != nil {
 					return err
 				}

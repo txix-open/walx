@@ -76,13 +76,14 @@ func TestState(t *testing.T) {
 	wal = createWal(dir, require)
 	s = businessState{}
 	ss = state.New(wal, &s, "test")
-	err = ss.Recovery()
+	ctx := context.Background()
+	err = ss.Recovery(ctx)
 	require.NoError(err)
 
 	require.EqualValues(5, s.value)
 
 	go func() {
-		err := ss.Run(context.Background())
+		err := ss.Run(ctx)
 		require.NoError(err)
 	}()
 	time.Sleep(1 * time.Second) // we must run wait before first run

@@ -3,11 +3,13 @@ package replication
 import (
 	"context"
 	"fmt"
-	"github.com/txix-open/walx/stream"
-	"google.golang.org/grpc/credentials"
 	"io"
 	"net"
 	"runtime"
+	"sync"
+
+	"github.com/txix-open/walx/stream"
+	"google.golang.org/grpc/credentials"
 
 	"github.com/pkg/errors"
 	"github.com/txix-open/isp-kit/log"
@@ -23,6 +25,9 @@ type Server struct {
 	srv     *grpc.Server
 	options *serverOptions
 	logger  log.Logger
+
+	cancelFuncs map[string]context.CancelFunc
+	mu          sync.Mutex
 }
 
 func NewServer(hotWal *walx.Log, log log.Logger, opts ...ServerOption) *Server {
@@ -36,17 +41,30 @@ func NewServer(hotWal *walx.Log, log log.Logger, opts ...ServerOption) *Server {
 	}
 	srv := grpc.NewServer(serverOpts...)
 	s := &Server{
-		hotWal:  hotWal,
-		srv:     srv,
-		options: options,
-		logger:  log,
+		hotWal:      hotWal,
+		srv:         srv,
+		options:     options,
+		logger:      log,
+		cancelFuncs: make(map[string]context.CancelFunc),
+		mu:          sync.Mutex{},
 	}
 	replicator.RegisterReplicatorServer(srv, s)
 	return s
 }
 
 func (s *Server) Begin(request *replicator.BeginRequest, server replicator.Replicator_BeginServer) (err error) {
-	ctx := log.ToContext(server.Context(), log.String("clientId", requestid.Next()))
+	clientId := requestid.Next()
+	ctx := log.ToContext(server.Context(), log.String("clientId", clientId))
+	ctx, cancel := context.WithCancel(ctx)
+	defer func() {
+		s.mu.Lock()
+		cancel()
+		delete(s.cancelFuncs, clientId)
+		s.mu.Unlock()
+	}()
+	s.mu.Lock()
+	s.cancelFuncs[clientId] = cancel
+	s.mu.Unlock()
 
 	s.logger.Info(
 		ctx,
@@ -91,11 +109,13 @@ func (s *Server) Begin(request *replicator.BeginRequest, server replicator.Repli
 	}()
 
 	for {
-		entry, err := reader.Read()
-		if errors.Is(err, walx.ErrClosed) {
+		entry, err := reader.Read(ctx)
+		switch {
+		case errors.Is(err, walx.ErrClosed):
 			return nil
-		}
-		if err != nil {
+		case errors.Is(err, context.Canceled):
+			return nil
+		case err != nil:
 			return errors.WithMessage(err, "read next log entry")
 		}
 
@@ -141,6 +161,11 @@ func (s *Server) Serve(lis net.Listener) error {
 }
 
 func (s *Server) Close() error {
+	s.mu.Lock()
+	for _, cancel := range s.cancelFuncs {
+		cancel()
+	}
+	s.mu.Unlock()
 	s.srv.GracefulStop()
 	return nil
 }
@@ -161,7 +186,7 @@ func (s *Server) sendColdLogs(ctx context.Context, matcher stream.Matcher, index
 	defer reader.Close()
 
 	for i := index; i < wal.LastIndex(); i++ {
-		entry, err := reader.Read()
+		entry, err := reader.Read(ctx)
 		if err != nil {
 			return errors.WithMessage(err, "read next log entry")
 		}

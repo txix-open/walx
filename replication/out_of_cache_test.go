@@ -2,11 +2,12 @@ package replication_test
 
 import (
 	"context"
-	"github.com/txix-open/walx/stream"
 	"os"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/txix-open/walx/stream"
 
 	"github.com/stretchr/testify/require"
 	"github.com/txix-open/isp-kit/log"
@@ -57,10 +58,11 @@ func TestOutOfCache(t *testing.T) {
 		_ = masterWal.Close()
 	})
 	s := state.New(masterWal, fsm{}, "test")
-	err = s.Recovery()
+	ctx := context.Background()
+	err = s.Recovery(ctx)
 	require.NoError(err)
 	go func() {
-		err := s.Run(context.Background())
+		err := s.Run(ctx)
 		require.NoError(err)
 	}()
 	time.Sleep(300 * time.Millisecond)
@@ -99,7 +101,7 @@ func TestOutOfCache(t *testing.T) {
 		require.NoError(err)
 		cli := replication.NewClient(slaveWal, "test", addr, []string{stream.AllStreams}, logger)
 		go func() {
-			err := cli.Run(context.Background())
+			err := cli.Run(ctx)
 			require.NoError(err)
 		}()
 	}
