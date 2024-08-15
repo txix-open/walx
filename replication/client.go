@@ -2,10 +2,12 @@ package replication
 
 import (
 	"context"
-	"google.golang.org/grpc/credentials"
 	"io"
+	"sync"
 	"sync/atomic"
 	"time"
+
+	"google.golang.org/grpc/credentials"
 
 	"github.com/pkg/errors"
 	"github.com/txix-open/isp-kit/log"
@@ -33,6 +35,7 @@ type Client struct {
 	options         *clientOptions
 
 	grpcCli *grpc.ClientConn
+	mu      sync.Locker
 }
 
 func NewClient(
@@ -56,6 +59,8 @@ func NewClient(
 		filteredStreams: filteredStreams,
 		options:         options,
 		logger:          logger,
+		grpcCli:         nil,
+		mu:              &sync.Mutex{},
 	}
 }
 
@@ -109,9 +114,11 @@ func (c *Client) Run(ctx context.Context) error {
 }
 
 func (c *Client) begin(ctx context.Context) (replicator.Replicator_BeginClient, error) {
+	c.mu.Lock()
 	if c.grpcCli != nil {
 		_ = c.grpcCli.Close()
 	}
+	c.mu.Unlock()
 
 	var err error
 	dialCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -124,11 +131,14 @@ func (c *Client) begin(ctx context.Context) (replicator.Replicator_BeginClient, 
 	} else {
 		dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
+
+	c.mu.Lock()
 	c.grpcCli, err = grpc.DialContext(
 		dialCtx,
 		c.remoteAddr,
 		dialOpts...,
 	)
+	c.mu.Unlock()
 	if err != nil {
 		return nil, errors.WithMessagef(err, "grpc dial to %s", c.remoteAddr)
 	}
@@ -162,9 +172,11 @@ func (c *Client) logReplicationIndex(ctx context.Context) {
 
 func (c *Client) Close() error {
 	c.closed.Store(true)
+	c.mu.Lock()
 	if c.grpcCli != nil {
 		_ = c.grpcCli.Close()
 	}
+	c.mu.Unlock()
 	<-c.close
 	return nil
 }
