@@ -64,10 +64,24 @@ func (l *Log) Write(data []byte, nextIndex func(index uint64)) (uint64, error) {
 
 	next := l.index.Load() + 1
 	nextIndex(next)
-	startWrite := time.Now()
-	err := l.log.Write(next, data)
+	err := l.write(next, data)
 	if err != nil {
-		return 0, fmt.Errorf("wal write: %w", err)
+		return 0, fmt.Errorf("write: %w", err)
+	}
+	return next, nil
+}
+
+func (l *Log) WriteEntry(entry Entry) error {
+	l.lock.Lock()
+	defer l.lock.Unlock()
+	return l.write(entry.Index, entry.Data)
+}
+
+func (l *Log) write(index uint64, data []byte) error {
+	startWrite := time.Now()
+	err := l.log.Write(index, data)
+	if err != nil {
+		return fmt.Errorf("wal write: %w", err)
 	}
 	writeTime := time.Since(startWrite)
 
@@ -75,44 +89,21 @@ func (l *Log) Write(data []byte, nextIndex func(index uint64)) (uint64, error) {
 	var fsyncTime time.Duration
 	fsyncCalled, err := l.trySync(data)
 	if err != nil {
-		return 0, err
+		return err
 	}
 	if fsyncCalled {
 		fsyncTime = time.Since(startFsync)
 	}
 
 	l.hook(HookData{
-		Index:       next,
+		Index:       index,
 		Data:        data,
 		WriteTime:   writeTime,
 		FSyncCalled: fsyncCalled,
 		FSyncTime:   fsyncTime,
 	})
 
-	l.index.Add(1)
-
-	for _, reader := range l.subs {
-		reader.notify()
-	}
-
-	return next, nil
-}
-
-func (l *Log) WriteEntry(entry Entry) error {
-	l.lock.Lock()
-	defer l.lock.Unlock()
-
-	err := l.log.Write(entry.Index, entry.Data)
-	if err != nil {
-		return fmt.Errorf("wal write: %w", err)
-	}
-
-	_, err = l.trySync(entry.Data)
-	if err != nil {
-		return err
-	}
-
-	l.index.Store(entry.Index)
+	l.index.Store(index)
 
 	for _, reader := range l.subs {
 		reader.notify()
