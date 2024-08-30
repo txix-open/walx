@@ -8,8 +8,11 @@ import (
 	"runtime"
 	"sync"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/txix-open/isp-kit/metrics"
 	"github.com/txix-open/walx/stream"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/peer"
 
 	"github.com/pkg/errors"
 	"github.com/txix-open/isp-kit/log"
@@ -26,8 +29,9 @@ type Server struct {
 	options *serverOptions
 	logger  log.Logger
 
-	cancelFuncs map[string]context.CancelFunc
-	mu          sync.Mutex
+	cancelFuncs   map[string]context.CancelFunc
+	mu            sync.Mutex
+	indexLagGauge *prometheus.GaugeVec
 }
 
 func NewServer(hotWal *walx.Log, log log.Logger, opts ...ServerOption) *Server {
@@ -47,6 +51,12 @@ func NewServer(hotWal *walx.Log, log log.Logger, opts ...ServerOption) *Server {
 		logger:      log,
 		cancelFuncs: make(map[string]context.CancelFunc),
 		mu:          sync.Mutex{},
+		indexLagGauge: metrics.GetOrRegister(metrics.DefaultRegistry, prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Subsystem:   "wal",
+			Name:        "index_lag",
+			Help:        "Index lag from current master position",
+			ConstLabels: nil,
+		}, []string{"client_ip"})),
 	}
 	replicator.RegisterReplicatorServer(srv, s)
 	return s
@@ -81,17 +91,6 @@ func (s *Server) Begin(request *replicator.BeginRequest, server replicator.Repli
 		}
 	}()
 
-	if !s.hotWal.IsInMemory(request.LastIndex + 1) {
-		err := s.sendColdLogs(ctx, matcher, request.LastIndex, server)
-		if err != nil {
-			return errors.WithMessage(err, "sent cold logs")
-		}
-		return nil
-	}
-
-	reader := s.hotWal.OpenReader(request.LastIndex)
-	defer reader.Close()
-
 	defer func() {
 		r := recover()
 		if r == nil {
@@ -108,6 +107,19 @@ func (s *Server) Begin(request *replicator.BeginRequest, server replicator.Repli
 		err = errors.Errorf("replication is not available. possibly lag is too big, max lag = 4GB.\n cause: %v %s\n", err, stack[:length])
 	}()
 
+	if !s.hotWal.IsInMemory(request.LastIndex + 1) {
+		err := s.sendColdLogs(ctx, matcher, request.LastIndex, server)
+		if err != nil {
+			return errors.WithMessage(err, "sent cold logs")
+		}
+		return nil
+	}
+
+	reader := s.hotWal.OpenReader(request.LastIndex)
+	defer reader.Close()
+
+	clientIp := s.getClientIp(ctx)
+	gauge := s.indexLagGauge.WithLabelValues(clientIp)
 	for {
 		entry, err := reader.Read(ctx)
 		switch {
@@ -118,6 +130,8 @@ func (s *Server) Begin(request *replicator.BeginRequest, server replicator.Repli
 		case err != nil:
 			return errors.WithMessage(err, "read next log entry")
 		}
+
+		s.logIndexLag(ctx, gauge, s.hotWal.LastIndex(), entry.Index, clientIp)
 
 		var entryData []byte
 		if matcher.Match(entry) {
@@ -185,11 +199,15 @@ func (s *Server) sendColdLogs(ctx context.Context, matcher stream.Matcher, index
 	reader := wal.OpenReader(index)
 	defer reader.Close()
 
+	clientIp := s.getClientIp(ctx)
+	gauge := s.indexLagGauge.WithLabelValues(clientIp)
 	for i := index; i < wal.LastIndex(); i++ {
 		entry, err := reader.Read(ctx)
 		if err != nil {
 			return errors.WithMessage(err, "read next log entry")
 		}
+
+		s.logIndexLag(ctx, gauge, wal.LastIndex(), entry.Index, clientIp)
 
 		var entryData []byte
 		if matcher.Match(entry) {
@@ -206,4 +224,28 @@ func (s *Server) sendColdLogs(ctx context.Context, matcher stream.Matcher, index
 	}
 
 	return nil
+}
+
+func (s *Server) logIndexLag(ctx context.Context, gauge prometheus.Gauge, lastIdx uint64, clientIdx uint64, clientIp string) {
+	indexLag := int64(lastIdx) - int64(clientIdx)
+	gauge.Set(float64(indexLag))
+
+	shouldLog := indexLag >= s.options.minIndexLagToLog && clientIdx%500 == 0
+	if shouldLog {
+		s.logger.Warn(ctx, fmt.Sprintf("client '%s' is lagging behind on index by %d positions", clientIp, indexLag))
+	}
+}
+
+func (s *Server) getClientIp(ctx context.Context) string {
+	peer, ok := peer.FromContext(ctx)
+	if !ok {
+		s.logger.Warn(ctx, "can't get peer info from context")
+		return ""
+	}
+	host, _, err := net.SplitHostPort(peer.Addr.String())
+	if err != nil {
+		s.logger.Warn(ctx, errors.WithMessage(err, "split host & port"))
+		return ""
+	}
+	return host
 }
