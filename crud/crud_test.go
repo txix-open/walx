@@ -1,6 +1,7 @@
 package crud_test
 
 import (
+	"github.com/txix-open/isp-kit/test/fake"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -64,4 +65,25 @@ func TestState(t *testing.T) {
 
 	item = crud1.Get("1")
 	require.Nil(item)
+}
+
+func TestState_BulkUpsert(t *testing.T) {
+	t.Parallel()
+	require := require.New(t)
+
+	item1 := fake.It[Item1]()
+	item2 := fake.It[Item1]()
+	crud := crud.New[Item1]("crud")
+	tstate.ServeState(t, crud)
+	err := crud.BulkUpsert([]Item1{
+		item1,
+		item2,
+	})
+	require.NoError(err)
+
+	receivedItem1 := crud.Get(item1.Id)
+	require.EqualValues(item1, *receivedItem1)
+
+	receivedItem2 := crud.Get(item2.Id)
+	require.EqualValues(item2, *receivedItem2)
 }

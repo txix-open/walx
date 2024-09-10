@@ -26,12 +26,13 @@ type Hooks[T WithId] struct {
 type nothing struct{}
 
 type request[T WithId] struct {
-	State            string `json:"__state__"`
-	UpsertRequest    *T     `json:",omitempty"`
-	UpdateRequest    *T     `json:",omitempty"`
-	InsertRequest    *T     `json:",omitempty"`
-	DeleteRequest    string `json:",omitempty"`
-	DeleteAllRequest bool   `json:",omitempty"`
+	State             string `json:"__state__"`
+	UpsertRequest     *T     `json:",omitempty"`
+	UpdateRequest     *T     `json:",omitempty"`
+	InsertRequest     *T     `json:",omitempty"`
+	DeleteRequest     string `json:",omitempty"`
+	DeleteAllRequest  bool   `json:",omitempty"`
+	BulkUpsertRequest []T    `json:",omitempty"`
 }
 
 type WithId interface {
@@ -210,6 +211,25 @@ func (s *State[T]) insert(item T) (any, error) {
 	return nothing{}, nil
 }
 
+func (s *State[T]) BulkUpsert(items []T) error {
+	_, err := state.ApplyWithStreamSuffix[nothing](s.mutator, request[T]{
+		State:             s.name,
+		BulkUpsertRequest: items,
+	}, s.streamSuffix)
+	return err
+}
+
+func (s *State[T]) bulkUpsert(items []T) (any, error) {
+	for _, item := range items {
+		_, updated := s.items[item.GetId()]
+		s.items[item.GetId()] = &item
+		for _, hook := range s.hooks.UpsertHooks {
+			hook(&item, updated)
+		}
+	}
+	return nothing{}, nil
+}
+
 func (s *State[T]) StateName() string {
 	return s.name
 }
@@ -238,6 +258,8 @@ func (s *State[T]) Apply(data []byte) (any, error) {
 		return s.delete(req.DeleteRequest)
 	case req.DeleteAllRequest:
 		return s.deleteAll()
+	case req.BulkUpsertRequest != nil:
+		return s.bulkUpsert(req.BulkUpsertRequest)
 	default:
 		return nil, errors.New("handler not found")
 	}
