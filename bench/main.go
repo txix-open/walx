@@ -9,7 +9,6 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
-	"runtime/debug"
 	"sync"
 	"time"
 
@@ -75,8 +74,7 @@ func (c controller) Apply(log []byte) (any, error) {
 }
 
 func main() {
-	debug.SetMemoryLimit(2 * 1024 * 1024 * 1024)
-	logger, err := log.New(log.WithLevel(log.DebugLevel))
+	logger, err := log.New(log.WithLevel(log.InfoLevel))
 	if err != nil {
 		panic(err)
 	}
@@ -94,7 +92,7 @@ func main() {
 	}
 	state := state.New(wal, controller, "test")
 	defer state.Close()
-	err = state.Recovery()
+	err = state.Recovery(context.Background())
 	if err != nil {
 		panic(err)
 	}
