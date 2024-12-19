@@ -129,6 +129,14 @@ func (l *Log) OpenReader(lastIndex uint64) *Reader {
 	return reader
 }
 
+func (l *Log) FirstIndex() (uint64, error) {
+	ret, err := l.log.FirstIndex()
+	if err != nil {
+		return 0, fmt.Errorf("wal first index: %w", err)
+	}
+	return ret, nil
+}
+
 func (l *Log) LastIndex() uint64 {
 	return l.index.Load()
 }
