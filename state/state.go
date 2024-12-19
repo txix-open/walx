@@ -44,6 +44,9 @@ func (s *State) Recovery(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	if firstIdx > 0 {
+		firstIdx--
+	}
 
 	reader := s.Log.OpenReader(firstIdx)
 	defer reader.Close()

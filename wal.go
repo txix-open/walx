@@ -134,9 +134,6 @@ func (l *Log) FirstIndex() (uint64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("wal first index: %w", err)
 	}
-	if ret > 0 {
-		ret--
-	}
 	return ret, nil
 }
 
