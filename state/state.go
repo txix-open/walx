@@ -40,11 +40,19 @@ func New(log *walx.Log, fsm FSM, primaryStream string) *State {
 }
 
 func (s *State) Recovery(ctx context.Context) error {
-	reader := s.Log.OpenReader(0)
+	firstIdx, err := s.FirstIndex()
+	if err != nil {
+		return err
+	}
+	if firstIdx > 0 {
+		firstIdx--
+	}
+
+	reader := s.Log.OpenReader(firstIdx)
 	defer reader.Close()
 
 	lastIndex := s.Log.LastIndex()
-	for i := uint64(0); i < lastIndex; i++ {
+	for i := firstIdx; i < lastIndex; i++ {
 		entry, err := reader.Read(ctx)
 		if err != nil {
 			return err
