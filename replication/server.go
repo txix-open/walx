@@ -62,7 +62,7 @@ func NewServer(hotWal *walx.Log, log log.Logger, opts ...ServerOption) *Server {
 	return s
 }
 
-func (s *Server) Begin(request *replicator.BeginRequest, server replicator.Replicator_BeginServer) (err error) {
+func (s *Server) BeginReplication(request *replicator.BeginRequest, server replicator.Replicator_BeginReplicationServer) (err error) {
 	clientId := requestid.Next()
 	ctx := log.ToContext(server.Context(), log.String("clientId", clientId))
 	ctx, cancel := context.WithCancel(ctx)
@@ -107,21 +107,15 @@ func (s *Server) Begin(request *replicator.BeginRequest, server replicator.Repli
 		err = errors.Errorf("replication is not available. possibly lag is too big, max lag = 4GB.\n cause: %v %s\n", err, stack[:length])
 	}()
 
-	if !s.hotWal.IsInMemory(request.LastIndex + 1) {
-		err := s.sendColdLogs(ctx, matcher, request.LastIndex, server)
-		if err != nil {
-			return errors.WithMessage(err, "sent cold logs")
-		}
-		return nil
-	}
-
 	reader := s.hotWal.OpenReader(request.LastIndex)
 	defer reader.Close()
 
 	clientIp := s.getClientIp(ctx)
 	gauge := s.indexLagGauge.WithLabelValues(clientIp)
+	toSend := make([]*replicator.Entry, 0)
+	var emptyData []byte
 	for {
-		entry, err := reader.Read(ctx)
+		entries, err := reader.ReadAtMost(ctx, int(request.Limit))
 		switch {
 		case errors.Is(err, walx.ErrClosed):
 			return nil
@@ -131,16 +125,22 @@ func (s *Server) Begin(request *replicator.BeginRequest, server replicator.Repli
 			return errors.WithMessage(err, "read next log entry")
 		}
 
-		s.logIndexLag(ctx, gauge, s.hotWal.LastIndex(), entry.Index, clientIp)
+		s.logIndexLag(ctx, gauge, s.hotWal.LastIndex(), entries.LastIndex(), clientIp)
 
-		var entryData []byte
-		if matcher.Match(entry) {
-			entryData = entry.Data
+		toSend = toSend[:0]
+		for _, entry := range entries {
+			entryData := emptyData
+			if matcher.Match(entry) {
+				entryData = entry.Data
+			}
+			toSend = append(toSend, &replicator.Entry{
+				Data:  entryData,
+				Index: entry.Index,
+			})
 		}
 
-		err = server.Send(&replicator.Entry{
-			Data:  entryData,
-			Index: entry.Index,
+		err = server.Send(&replicator.Entries{
+			Entries: toSend,
 		})
 		if errors.Is(err, io.EOF) {
 			return nil
@@ -181,48 +181,6 @@ func (s *Server) Close() error {
 	}
 	s.mu.Unlock()
 	s.srv.GracefulStop()
-	return nil
-}
-
-func (s *Server) sendColdLogs(ctx context.Context, matcher stream.Matcher, index uint64, server replicator.Replicator_BeginServer) error {
-	s.logger.Info(ctx, "requested log is out of cache, sending cold logs")
-	defer func() {
-		s.logger.Info(ctx, "stop sending cold logs")
-	}()
-
-	wal, err := s.options.oldSegmentOpener()
-	if err != nil {
-		return errors.WithMessage(err, "open new wal")
-	}
-	defer wal.Close()
-
-	reader := wal.OpenReader(index)
-	defer reader.Close()
-
-	clientIp := s.getClientIp(ctx)
-	gauge := s.indexLagGauge.WithLabelValues(clientIp)
-	for i := index; i < wal.LastIndex(); i++ {
-		entry, err := reader.Read(ctx)
-		if err != nil {
-			return errors.WithMessage(err, "read next log entry")
-		}
-
-		s.logIndexLag(ctx, gauge, wal.LastIndex(), entry.Index, clientIp)
-
-		var entryData []byte
-		if matcher.Match(entry) {
-			entryData = entry.Data
-		}
-
-		err = server.Send(&replicator.Entry{
-			Data:  entryData,
-			Index: entry.Index,
-		})
-		if err != nil {
-			return errors.WithMessage(err, "send log entry")
-		}
-	}
-
 	return nil
 }
 

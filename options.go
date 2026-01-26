@@ -11,11 +11,11 @@ const (
 )
 
 type HookData struct {
-	Index       uint64
-	Data        []byte
-	WriteTime   time.Duration
-	FSyncCalled bool
-	FSyncTime   time.Duration
+	LastIndex    uint64
+	BytesWritten int
+	WriteTime    time.Duration
+	FSyncCalled  bool
+	FSyncTime    time.Duration
 }
 
 type Hook func(data HookData)

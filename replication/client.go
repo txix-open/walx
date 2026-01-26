@@ -19,8 +19,12 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const (
+	DefaultLimit = 100
+)
+
 type Wal interface {
-	WriteEntry(entry walx.Entry) error
+	WriteEntries(entries walx.Entries) error
 	LastIndex() uint64
 }
 
@@ -81,8 +85,9 @@ func (c *Client) Run(ctx context.Context) error {
 			continue
 		}
 
+		toWrite := make(walx.Entries, 0)
 		for {
-			entry, err := reader.Recv()
+			entries, err := reader.Recv()
 			if status.Code(err) == codes.Canceled || c.closed.Load() {
 				c.logger.Info(ctx, "stop replication, close signal received", log.Any("lastIndex", c.wal.LastIndex()))
 				return nil
@@ -97,10 +102,15 @@ func (c *Client) Run(ctx context.Context) error {
 				break
 			}
 
-			err = c.wal.WriteEntry(walx.Entry{
-				Data:  entry.Data,
-				Index: entry.Index,
-			})
+			toWrite = toWrite[:0]
+			for _, entry := range entries.GetEntries() {
+				toWrite = append(toWrite, walx.Entry{
+					Data:  entry.Data,
+					Index: entry.Index,
+				})
+			}
+
+			err = c.wal.WriteEntries(toWrite)
 			if err != nil {
 				return errors.WithMessage(err, "wal write entry")
 			}
@@ -113,7 +123,7 @@ func (c *Client) Run(ctx context.Context) error {
 	}
 }
 
-func (c *Client) begin(ctx context.Context) (replicator.Replicator_BeginClient, error) {
+func (c *Client) begin(ctx context.Context) (replicator.Replicator_BeginReplicationClient, error) {
 	c.mu.Lock()
 	if c.grpcCli != nil {
 		_ = c.grpcCli.Close()
@@ -146,9 +156,10 @@ func (c *Client) begin(ctx context.Context) (replicator.Replicator_BeginClient, 
 
 	lastIndex := c.wal.LastIndex()
 	c.logger.Info(ctx, "begin state replication", log.String("remoteAddress", c.remoteAddr), log.Any("lastIndex", lastIndex))
-	reader, err := replCli.Begin(ctx, &replicator.BeginRequest{
+	reader, err := replCli.BeginReplication(ctx, &replicator.BeginRequest{
 		LastIndex:       lastIndex,
 		FilteredStreams: c.filteredStreams,
+		Limit:           DefaultLimit,
 	})
 	if err != nil {
 		return nil, errors.WithMessage(err, "call begin")

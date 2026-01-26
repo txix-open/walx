@@ -6,12 +6,14 @@ type result struct {
 }
 
 type future struct {
-	ch chan result
+	event any
+	ch    chan result
 }
 
-func newFuture() *future {
+func newFuture(event any) *future {
 	return &future{
-		ch: make(chan result, 1),
+		event: event,
+		ch:    make(chan result, 1),
 	}
 }
 
