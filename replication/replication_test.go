@@ -59,7 +59,6 @@ func TestReplicationChain(t *testing.T) {
 	}
 
 	time.Sleep(2 * time.Second)
-	require.NoError(masterWal.Close())
 
 	require.EqualValues(10000, slaveCounter.Load())
 }

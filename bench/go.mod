@@ -3,11 +3,10 @@ module walx/bench
 go 1.25
 
 replace github.com/txix-open/walx => ./..
-replace github.com/txix-open/wal => /Users/yankomissarov/GolandProjects/wal
 
 require (
 	github.com/julienschmidt/httprouter v1.3.0
-	github.com/txix-open/isp-kit v1.64.6
+	github.com/txix-open/isp-kit v1.64.10
 	github.com/txix-open/walx v0.0.0-00010101000000-000000000000
 )
 
@@ -38,7 +37,7 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/tinylru v1.2.1 // indirect
 	github.com/txix-open/validator/v10 v10.0.0-20250506161033-f8ce404fffdb // indirect
-	github.com/txix-open/wal v1.3.0 // indirect
+	github.com/txix-open/wal v1.4.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel v1.38.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.38.0 // indirect

@@ -59,7 +59,7 @@ func (s *State) Recovery(ctx context.Context) error {
 		firstIdx--
 	}
 
-	reader := s.Log.OpenReader(firstIdx)
+	reader := s.Log.OpenInMemReader(firstIdx)
 	defer reader.Close()
 
 	lastIndex := s.Log.LastIndex()
@@ -100,7 +100,7 @@ func (s *State) Apply(event any, streamSuffix []byte) (any, error) {
 
 func (s *State) Run(ctx context.Context) error {
 	lastIndex := s.Log.LastIndex()
-	reader := s.Log.OpenReader(lastIndex)
+	reader := s.Log.OpenInMemReader(lastIndex)
 	defer reader.Close()
 
 	for {
@@ -120,7 +120,7 @@ func (s *State) Run(ctx context.Context) error {
 		featureValue, _ := s.futures.LoadAndDelete(entry.Index)
 		future, ok := featureValue.(*future)
 
-		log := Log{serializedEvent: data}
+		log := NewLog(data)
 		if ok && future.event != nil {
 			log.event = future.event
 		}

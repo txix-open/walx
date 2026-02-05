@@ -24,7 +24,7 @@ import (
 
 type Server struct {
 	replicator.UnimplementedReplicatorServer
-	hotWal  *walx.Log
+	wal     *walx.Log
 	srv     *grpc.Server
 	options *serverOptions
 	logger  log.Logger
@@ -34,7 +34,7 @@ type Server struct {
 	indexLagGauge *prometheus.GaugeVec
 }
 
-func NewServer(hotWal *walx.Log, log log.Logger, opts ...ServerOption) *Server {
+func NewServer(wal *walx.Log, log log.Logger, opts ...ServerOption) *Server {
 	options := newServerOptions()
 	for _, opt := range opts {
 		opt(options)
@@ -45,7 +45,7 @@ func NewServer(hotWal *walx.Log, log log.Logger, opts ...ServerOption) *Server {
 	}
 	srv := grpc.NewServer(serverOpts...)
 	s := &Server{
-		hotWal:      hotWal,
+		wal:         wal,
 		srv:         srv,
 		options:     options,
 		logger:      log,
@@ -107,7 +107,7 @@ func (s *Server) BeginReplication(request *replicator.BeginRequest, server repli
 		err = errors.Errorf("replication is not available. possibly lag is too big, max lag = 4GB.\n cause: %v %s\n", err, stack[:length])
 	}()
 
-	reader := s.hotWal.OpenReader(request.LastIndex)
+	reader := s.wal.OpenReader(request.LastIndex)
 	defer reader.Close()
 
 	clientIp := s.getClientIp(ctx)
@@ -125,7 +125,7 @@ func (s *Server) BeginReplication(request *replicator.BeginRequest, server repli
 			return errors.WithMessage(err, "read next log entry")
 		}
 
-		s.logIndexLag(ctx, gauge, s.hotWal.LastIndex(), entries.LastIndex(), clientIp)
+		s.logIndexLag(ctx, gauge, s.wal.LastIndex(), entries.LastIndex(), clientIp)
 
 		toSend = toSend[:0]
 		for _, entry := range entries {
@@ -152,7 +152,7 @@ func (s *Server) BeginReplication(request *replicator.BeginRequest, server repli
 }
 
 func (s *Server) DebugWrite(ctx context.Context, request *replicator.WriteRequest) (*replicator.WriteResponse, error) {
-	index, err := s.hotWal.Write(request.Data, func(index uint64) {
+	index, err := s.wal.Write(request.Data, func(index uint64) {
 
 	})
 	if err != nil {

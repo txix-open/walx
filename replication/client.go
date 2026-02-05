@@ -19,10 +19,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const (
-	DefaultLimit = 100
-)
-
 type Wal interface {
 	WriteEntries(entries walx.Entries) error
 	LastIndex() uint64
@@ -159,7 +155,7 @@ func (c *Client) begin(ctx context.Context) (replicator.Replicator_BeginReplicat
 	reader, err := replCli.BeginReplication(ctx, &replicator.BeginRequest{
 		LastIndex:       lastIndex,
 		FilteredStreams: c.filteredStreams,
-		Limit:           DefaultLimit,
+		Limit:           c.options.batchSize,
 	})
 	if err != nil {
 		return nil, errors.WithMessage(err, "call begin")
