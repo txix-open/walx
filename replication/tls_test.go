@@ -13,7 +13,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 	"github.com/txix-open/isp-kit/log"
-	"github.com/txix-open/walx/replication"
+	"github.com/txix-open/walx/v2/replication"
 )
 
 func TestClientTls(t *testing.T) {

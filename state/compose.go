@@ -29,8 +29,8 @@ func (c composedFSM) SetMutator(state Mutator) {
 	}
 }
 
-func (c composedFSM) Apply(log []byte) (any, error) {
-	stateName := gjson.GetBytes(log, NameField)
+func (c composedFSM) Apply(log Log) (any, error) {
+	stateName := gjson.GetBytes(log.serializedEvent, NameField)
 	if stateName.Exists() {
 		state, ok := c.stateByName[stateName.Str]
 		if ok {

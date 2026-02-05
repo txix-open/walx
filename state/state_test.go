@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/txix-open/walx"
-	"github.com/txix-open/walx/state"
+	"github.com/txix-open/walx/v2"
+	"github.com/txix-open/walx/v2/state"
 )
 
 type v struct {
@@ -27,9 +27,8 @@ type businessState struct {
 	value int
 }
 
-func (s *businessState) Apply(log []byte) (any, error) {
-	e := events{}
-	err := state.UnmarshalEvent(log, &e)
+func (s *businessState) Apply(log state.Log) (any, error) {
+	e, err := state.UnmarshalEvent[events](log)
 	if err != nil {
 		return nil, err
 	}

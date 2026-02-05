@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/txix-open/walx/state"
+	"github.com/txix-open/walx/v2/state"
 )
 
 var (
@@ -234,9 +234,8 @@ func (s *State[T]) StateName() string {
 	return s.name
 }
 
-func (s *State[T]) Apply(data []byte) (any, error) {
-	req := request[T]{}
-	err := state.UnmarshalEvent(data, &req)
+func (s *State[T]) Apply(log state.Log) (any, error) {
+	req, err := state.UnmarshalEvent[request[T]](log)
 	if err != nil {
 		return nil, err
 	}

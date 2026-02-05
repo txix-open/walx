@@ -14,9 +14,10 @@ import (
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/txix-open/isp-kit/http/endpoint"
+	"github.com/txix-open/isp-kit/http/endpoint/httplog"
 	"github.com/txix-open/isp-kit/log"
-	"github.com/txix-open/walx"
-	"github.com/txix-open/walx/state"
+	"github.com/txix-open/walx/v2"
+	"github.com/txix-open/walx/v2/state"
 )
 
 type SaveData struct {
@@ -55,9 +56,8 @@ type controller struct {
 	s *service
 }
 
-func (c controller) Apply(log []byte) (any, error) {
-	e := events{}
-	err := state.UnmarshalEvent(log, &e)
+func (c controller) Apply(log state.Log) (any, error) {
+	e, err := state.UnmarshalEvent[events](log)
 	if err != nil {
 		return nil, err
 	}
@@ -116,14 +116,14 @@ func main() {
 		}()
 	}
 
-	wrapper := endpoint.DefaultWrapper(logger)
-	handler := wrapper.Endpoint(func(ctx context.Context, req SaveData) (string, error) {
+	wrapper := endpoint.DefaultWrapper(logger, httplog.Noop())
+	handler := wrapper.EndpointV2(endpoint.New(func(ctx context.Context, req SaveData) (string, error) {
 		s, err := state.Apply(events{SaveData: &req}, nil)
 		if err != nil {
 			return "", err
 		}
 		return s.(string), nil
-	})
+	}))
 	/*
 		go func() {
 			time.Sleep(3 * time.Second)

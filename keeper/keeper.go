@@ -10,11 +10,11 @@ import (
 	"github.com/txix-open/isp-kit/app"
 	"github.com/txix-open/isp-kit/log"
 	"github.com/txix-open/isp-kit/metrics"
-	"github.com/txix-open/walx"
-	"github.com/txix-open/walx/metric"
-	"github.com/txix-open/walx/replication"
-	"github.com/txix-open/walx/state"
-	"github.com/txix-open/walx/stream"
+	"github.com/txix-open/walx/v2"
+	"github.com/txix-open/walx/v2/metric"
+	"github.com/txix-open/walx/v2/replication"
+	"github.com/txix-open/walx/v2/state"
+	"github.com/txix-open/walx/v2/stream"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -61,9 +61,6 @@ func New(
 	logger.Info(ctx, "end state recovering")
 
 	serverOptions := slices.Clone(options.replicationServerOptions)
-	serverOptions = append(serverOptions, replication.ServerOldSegmentOpener(func() (*walx.Log, error) {
-		return walx.Open(dir, walx.SegmentsCachePolicy(1, 0))
-	}))
 	return &Keeper{
 		name:              name,
 		state:             ss,
@@ -195,7 +192,7 @@ func metricsHook() walx.Hook {
 		}),
 	)
 	return func(data walx.HookData) {
-		sizeMetric.Observe(float64(len(data.Data)))
+		sizeMetric.Observe(float64(data.BytesWritten))
 		writeTimeMetric.Observe(float64(data.WriteTime))
 		if data.FSyncCalled {
 			fsyncTimeMetric.Observe(float64(data.FSyncTime))

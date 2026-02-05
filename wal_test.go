@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/txix-open/walx"
+	"github.com/txix-open/walx/v2"
 	"golang.org/x/sync/errgroup"
 )
 

@@ -2,8 +2,8 @@ package stream
 
 import (
 	"github.com/pkg/errors"
-	"github.com/txix-open/walx/pool"
-	"github.com/txix-open/walx/state"
+	"github.com/txix-open/walx/v2/pool"
+	"github.com/txix-open/walx/v2/state"
 )
 
 type Log interface {

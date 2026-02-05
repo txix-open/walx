@@ -6,12 +6,23 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/txix-open/walx"
-	"github.com/txix-open/walx/pool"
+	"github.com/txix-open/walx/v2"
+	"github.com/txix-open/walx/v2/pool"
 )
 
+type Log struct {
+	serializedEvent []byte
+	event           any
+}
+
+func NewLog(serializedEvent []byte) Log {
+	return Log{
+		serializedEvent: serializedEvent,
+	}
+}
+
 type FSM interface {
-	Apply(log []byte) (any, error)
+	Apply(log Log) (any, error)
 }
 
 type Mutator interface {
@@ -48,7 +59,7 @@ func (s *State) Recovery(ctx context.Context) error {
 		firstIdx--
 	}
 
-	reader := s.Log.OpenReader(firstIdx)
+	reader := s.Log.OpenInMemReader(firstIdx)
 	defer reader.Close()
 
 	lastIndex := s.Log.LastIndex()
@@ -59,8 +70,9 @@ func (s *State) Recovery(ctx context.Context) error {
 		}
 
 		streamName, data := UnpackEvent(entry.Data)
+		log := Log{serializedEvent: data}
 		if MatchStream(streamName, s.primaryStream) {
-			_, _ = s.fsm.Apply(data)
+			_, _ = s.fsm.Apply(log)
 		}
 	}
 
@@ -74,7 +86,7 @@ func (s *State) Apply(event any, streamSuffix []byte) (any, error) {
 		return nil, fmt.Errorf("pack event: %w", err)
 	}
 
-	future := newFuture()
+	future := newFuture(event)
 	_, err = s.Log.Write(buff.Bytes(), func(index uint64) {
 		s.futures.Store(index, future)
 	})
@@ -88,7 +100,7 @@ func (s *State) Apply(event any, streamSuffix []byte) (any, error) {
 
 func (s *State) Run(ctx context.Context) error {
 	lastIndex := s.Log.LastIndex()
-	reader := s.Log.OpenReader(lastIndex)
+	reader := s.Log.OpenInMemReader(lastIndex)
 	defer reader.Close()
 
 	for {
@@ -105,12 +117,18 @@ func (s *State) Run(ctx context.Context) error {
 			continue
 		}
 
-		response, err := s.fsm.Apply(data)
+		featureValue, _ := s.futures.LoadAndDelete(entry.Index)
+		future, ok := featureValue.(*future)
 
-		value, _ := s.futures.LoadAndDelete(entry.Index)
-		feature, ok := value.(*future)
+		log := NewLog(data)
+		if ok && future.event != nil {
+			log.event = future.event
+		}
+
+		response, err := s.fsm.Apply(log)
+
 		if ok {
-			feature.complete(response, err)
+			future.complete(response, err)
 		}
 	}
 }

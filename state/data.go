@@ -6,8 +6,7 @@ import (
 	"io"
 
 	"github.com/pkg/errors"
-	"github.com/txix-open/walx/pool"
-	"github.com/txix-open/walx/state/enc"
+	"github.com/txix-open/walx/v2/state/enc"
 )
 
 const (
@@ -15,7 +14,7 @@ const (
 )
 
 func MarshalEvent(event any) ([]byte, error) {
-	buff := pool.AcquireBuffer()
+	buff := bytes.NewBuffer(make([]byte, 0, 512))
 	err := EncodeEvent(buff, event)
 	if err != nil {
 		return nil, err
@@ -31,12 +30,24 @@ func EncodeEvent(w io.Writer, event any) error {
 	return nil
 }
 
-func UnmarshalEvent(data []byte, event any) error {
-	err := enc.Unmarshal(data, &event)
-	if err != nil {
-		return fmt.Errorf("json unmarshal: %w", err)
+func UnmarshalEvent[T any](log Log) (T, error) {
+	var empty T
+
+	if log.event != nil {
+		event, ok := log.event.(T)
+		if !ok {
+			return empty, fmt.Errorf("unexpected event type. expected %T, got %T", empty, event)
+		}
+		return event, nil
 	}
-	return nil
+
+	var t T
+	err := enc.Unmarshal(log.serializedEvent, &t)
+	if err != nil {
+		return t, fmt.Errorf("json unmarshal: %w", err)
+	}
+
+	return t, nil
 }
 
 func PackEvent(primaryStream []byte, streamSuffix []byte, event any, w io.Writer) error {

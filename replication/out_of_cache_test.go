@@ -7,19 +7,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/txix-open/walx/stream"
+	"github.com/txix-open/walx/v2/stream"
 
 	"github.com/stretchr/testify/require"
 	"github.com/txix-open/isp-kit/log"
-	"github.com/txix-open/walx"
-	"github.com/txix-open/walx/replication"
-	"github.com/txix-open/walx/state"
+	"github.com/txix-open/walx/v2"
+	"github.com/txix-open/walx/v2/replication"
+	"github.com/txix-open/walx/v2/state"
 )
 
 type fsm struct {
 }
 
-func (f fsm) Apply(log []byte) (any, error) {
+func (f fsm) Apply(log state.Log) (any, error) {
 	return nil, nil
 }
 
@@ -66,9 +66,7 @@ func TestOutOfCache(t *testing.T) {
 		require.NoError(err)
 	}()
 	time.Sleep(300 * time.Millisecond)
-	server := replication.NewServer(masterWal, logger, replication.ServerOldSegmentOpener(func() (*walx.Log, error) {
-		return walx.Open(mDir, walx.SegmentsCachePolicy(2, 10))
-	}))
+	server := replication.NewServer(masterWal, logger)
 	lis, addr := listener(require)
 	go func() {
 		err := server.Serve(lis)
@@ -82,15 +80,6 @@ func TestOutOfCache(t *testing.T) {
 		})
 		require.NoError(err)
 	}
-	go func() {
-		for i := 0; i < 512; i++ {
-			data := make([]byte, 12)
-			_, err := s.Write(data, func(index uint64) {
-
-			})
-			require.NoError(err)
-		}
-	}()
 
 	for i := 0; i < 3; i++ {
 		sDir := dir()
@@ -106,6 +95,16 @@ func TestOutOfCache(t *testing.T) {
 		}()
 	}
 
-	time.Sleep(15 * time.Second)
+	go func() {
+		for i := 0; i < 512; i++ {
+			data := make([]byte, 12)
+			_, err := s.Write(data, func(index uint64) {
+
+			})
+			require.NoError(err)
+		}
+	}()
+
+	time.Sleep(25 * time.Second)
 	require.EqualValues(0, logger.errCounter.Load())
 }
