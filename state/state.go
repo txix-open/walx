@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/txix-open/walx"
-	"github.com/txix-open/walx/pool"
+	"github.com/txix-open/walx/v2"
+	"github.com/txix-open/walx/v2/pool"
 )
 
 type FSM interface {
-	Apply(log []byte) (any, error)
+	Apply(log Log) (any, error)
 }
 
 type Mutator interface {
@@ -25,14 +25,16 @@ type BusinessState interface {
 
 type State struct {
 	*walx.Log
+	codec         Codec
 	fsm           FSM
 	futures       *sync.Map
 	primaryStream []byte
 }
 
-func New(log *walx.Log, fsm FSM, primaryStream string) *State {
+func New(log *walx.Log, fsm FSM, codec Codec, primaryStream string) *State {
 	return &State{
 		Log:           log,
+		codec:         codec,
 		fsm:           fsm,
 		futures:       &sync.Map{},
 		primaryStream: []byte(primaryStream),
@@ -48,7 +50,7 @@ func (s *State) Recovery(ctx context.Context) error {
 		firstIdx--
 	}
 
-	reader := s.Log.OpenReader(firstIdx)
+	reader := s.Log.OpenInMemReader(firstIdx)
 	defer reader.Close()
 
 	lastIndex := s.Log.LastIndex()
@@ -59,8 +61,9 @@ func (s *State) Recovery(ctx context.Context) error {
 		}
 
 		streamName, data := UnpackEvent(entry.Data)
+		log := NewLog(data, s.codec)
 		if MatchStream(streamName, s.primaryStream) {
-			_, _ = s.fsm.Apply(data)
+			_, _ = s.fsm.Apply(log)
 		}
 	}
 
@@ -69,12 +72,12 @@ func (s *State) Recovery(ctx context.Context) error {
 
 func (s *State) Apply(event any, streamSuffix []byte) (any, error) {
 	buff := pool.AcquireBuffer()
-	err := PackEvent(s.primaryStream, streamSuffix, event, buff)
+	err := PackEvent(s.primaryStream, streamSuffix, event, s.codec, buff)
 	if err != nil {
 		return nil, fmt.Errorf("pack event: %w", err)
 	}
 
-	future := newFuture()
+	future := newFuture(event)
 	_, err = s.Log.Write(buff.Bytes(), func(index uint64) {
 		s.futures.Store(index, future)
 	})
@@ -88,7 +91,7 @@ func (s *State) Apply(event any, streamSuffix []byte) (any, error) {
 
 func (s *State) Run(ctx context.Context) error {
 	lastIndex := s.Log.LastIndex()
-	reader := s.Log.OpenReader(lastIndex)
+	reader := s.Log.OpenInMemReader(lastIndex)
 	defer reader.Close()
 
 	for {
@@ -105,12 +108,18 @@ func (s *State) Run(ctx context.Context) error {
 			continue
 		}
 
-		response, err := s.fsm.Apply(data)
+		featureValue, _ := s.futures.LoadAndDelete(entry.Index)
+		future, ok := featureValue.(*future)
 
-		value, _ := s.futures.LoadAndDelete(entry.Index)
-		feature, ok := value.(*future)
+		log := NewLog(data, s.codec)
+		if ok && future.event != nil {
+			log.event = future.event
+		}
+
+		response, err := s.fsm.Apply(log)
+
 		if ok {
-			feature.complete(response, err)
+			future.complete(response, err)
 		}
 	}
 }

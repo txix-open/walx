@@ -10,8 +10,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/txix-open/walx"
-	"github.com/txix-open/walx/state"
+	"github.com/txix-open/walx/v2"
+	"github.com/txix-open/walx/v2/state"
+	"github.com/txix-open/walx/v2/state/codec/json"
 )
 
 type v struct {
@@ -27,9 +28,8 @@ type businessState struct {
 	value int
 }
 
-func (s *businessState) Apply(log []byte) (any, error) {
-	e := events{}
-	err := state.UnmarshalEvent(log, &e)
+func (s *businessState) Apply(log state.Log) (any, error) {
+	e, err := state.UnmarshalEvent[events](log)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func TestState(t *testing.T) {
 
 	wal := createWal(dir, require)
 	s := businessState{}
-	ss := state.New(wal, &s, "test")
+	ss := state.New(wal, &s, json.NewCodec(), "test")
 	go func() {
 		err := ss.Run(context.Background())
 		require.NoError(err)
@@ -75,7 +75,7 @@ func TestState(t *testing.T) {
 
 	wal = createWal(dir, require)
 	s = businessState{}
-	ss = state.New(wal, &s, "test")
+	ss = state.New(wal, &s, json.NewCodec(), "test")
 	ctx := context.Background()
 	err = ss.Recovery(ctx)
 	require.NoError(err)

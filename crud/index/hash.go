@@ -3,7 +3,7 @@ package index
 import (
 	"sync"
 
-	"github.com/txix-open/walx/crud"
+	"github.com/txix-open/walx/v2/crud"
 )
 
 type Hash[T crud.WithId] struct {

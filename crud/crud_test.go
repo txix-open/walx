@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	"github.com/txix-open/walx/crud"
-	"github.com/txix-open/walx/state"
-	"github.com/txix-open/walx/tstate"
+	"github.com/txix-open/walx/v2/crud"
+	"github.com/txix-open/walx/v2/state"
+	"github.com/txix-open/walx/v2/tstate"
 )
 
 type Item1 struct {

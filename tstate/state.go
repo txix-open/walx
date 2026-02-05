@@ -9,8 +9,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/txix-open/walx"
-	"github.com/txix-open/walx/state"
+	"github.com/txix-open/walx/v2"
+	"github.com/txix-open/walx/v2/state"
+	"github.com/txix-open/walx/v2/state/codec/json"
 )
 
 func ServeState[T state.BusinessState](t *testing.T, s T) T {
@@ -25,7 +26,7 @@ func ServeStateWithState[T state.BusinessState](t *testing.T, s T, stateName str
 	dir := dir()
 	log, err := walx.Open(dir)
 	require.NoError(err)
-	state := state.New(log, s, stateName)
+	state := state.New(log, s, json.NewCodec(), stateName)
 	s.SetMutator(state)
 	go func() {
 		err := state.Run(context.Background())

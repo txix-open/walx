@@ -6,46 +6,61 @@ import (
 	"io"
 
 	"github.com/pkg/errors"
-	"github.com/txix-open/walx/pool"
-	"github.com/txix-open/walx/state/enc"
 )
 
 const (
 	maxStreamNameSize = 255
 )
 
-func MarshalEvent(event any) ([]byte, error) {
-	buff := pool.AcquireBuffer()
-	err := EncodeEvent(buff, event)
+type Codec interface {
+	Encode(w io.Writer, event any) error
+	Decode(data []byte, eventPtr any) error
+}
+
+func MarshalEvent(codec Codec, event any) ([]byte, error) {
+	buff := bytes.NewBuffer(make([]byte, 0, 512))
+	err := EncodeEvent(codec, buff, event)
 	if err != nil {
 		return nil, err
 	}
 	return buff.Bytes(), nil
 }
 
-func EncodeEvent(w io.Writer, event any) error {
-	err := enc.EncodeInto(w, event)
+func EncodeEvent(codec Codec, w io.Writer, event any) error {
+	err := codec.Encode(w, event)
 	if err != nil {
 		return fmt.Errorf("json marshal: %w", err)
 	}
 	return nil
 }
 
-func UnmarshalEvent(data []byte, event any) error {
-	err := enc.Unmarshal(data, &event)
-	if err != nil {
-		return fmt.Errorf("json unmarshal: %w", err)
+func UnmarshalEvent[T any](log Log) (T, error) {
+	var empty T
+
+	if log.event != nil {
+		event, ok := log.event.(T)
+		if !ok {
+			return empty, fmt.Errorf("unexpected event type. expected %T, got %T", empty, event)
+		}
+		return event, nil
 	}
-	return nil
+
+	var t T
+	err := log.Unmarshal(&t)
+	if err != nil {
+		return t, fmt.Errorf("unmarshal: %w", err)
+	}
+
+	return t, nil
 }
 
-func PackEvent(primaryStream []byte, streamSuffix []byte, event any, w io.Writer) error {
+func PackEvent(primaryStream []byte, streamSuffix []byte, event any, codec Codec, w io.Writer) error {
 	err := EncodeStreamData(primaryStream, streamSuffix, w)
 	if err != nil {
 		return err
 	}
 
-	err = EncodeEvent(w, event)
+	err = EncodeEvent(codec, w, event)
 	if err != nil {
 		return err
 	}

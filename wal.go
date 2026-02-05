@@ -17,8 +17,9 @@ type Log struct {
 	index          *atomic.Uint64
 	lock           sync.Locker
 	subId          *atomic.Int32
-	subs           map[int32]*Reader
+	subs           map[int32]Reader
 	log            *wal.Log
+	batch          *wal.Batch
 	hook           Hook
 	fsyncThreshold int
 	writtenBytes   int
@@ -50,11 +51,13 @@ func Open(dir string, opts ...Option) (*Log, error) {
 	return &Log{
 		index:          atomicIndex,
 		lock:           &sync.Mutex{},
-		log:            log,
 		subId:          &atomic.Int32{},
-		subs:           map[int32]*Reader{},
-		fsyncThreshold: options.fsyncThreshold,
+		subs:           map[int32]Reader{},
+		log:            log,
+		batch:          &wal.Batch{},
 		hook:           options.hook,
+		fsyncThreshold: options.fsyncThreshold,
+		writtenBytes:   0,
 	}, nil
 }
 
@@ -71,10 +74,33 @@ func (l *Log) Write(data []byte, nextIndex func(index uint64)) (uint64, error) {
 	return next, nil
 }
 
-func (l *Log) WriteEntry(entry Entry) error {
+func (l *Log) WriteEntries(entries Entries) error {
+	if len(entries) == 0 {
+		return nil
+	}
+
 	l.lock.Lock()
-	defer l.lock.Unlock()
-	return l.write(entry.Index, entry.Data)
+	defer func() {
+		l.batch.Clear()
+		l.lock.Unlock()
+	}()
+
+	lastIndex := entries.LastIndex()
+
+	bytesWritten := 0
+	for _, entry := range entries {
+		l.batch.Write(entry.Index, entry.Data)
+		bytesWritten += len(entry.Data)
+	}
+
+	startWrite := time.Now()
+	err := l.log.WriteBatch(l.batch)
+	if err != nil {
+		return fmt.Errorf("write batch: %w", err)
+	}
+	writeTime := time.Since(startWrite)
+
+	return l.postWrite(bytesWritten, writeTime, lastIndex)
 }
 
 func (l *Log) write(index uint64, data []byte) error {
@@ -85,9 +111,13 @@ func (l *Log) write(index uint64, data []byte) error {
 	}
 	writeTime := time.Since(startWrite)
 
+	return l.postWrite(len(data), writeTime, index)
+}
+
+func (l *Log) postWrite(bytesWritten int, writeTime time.Duration, index uint64) error {
 	startFsync := time.Now()
 	var fsyncTime time.Duration
-	fsyncCalled, err := l.trySync(data)
+	fsyncCalled, err := l.trySync(bytesWritten)
 	if err != nil {
 		return err
 	}
@@ -96,11 +126,11 @@ func (l *Log) write(index uint64, data []byte) error {
 	}
 
 	l.hook(HookData{
-		Index:       index,
-		Data:        data,
-		WriteTime:   writeTime,
-		FSyncCalled: fsyncCalled,
-		FSyncTime:   fsyncTime,
+		LastIndex:    index,
+		BytesWritten: bytesWritten,
+		WriteTime:    writeTime,
+		FSyncCalled:  fsyncCalled,
+		FSyncTime:    fsyncTime,
 	})
 
 	l.index.Store(index)
@@ -112,7 +142,15 @@ func (l *Log) write(index uint64, data []byte) error {
 	return nil
 }
 
-func (l *Log) OpenReader(lastIndex uint64) *Reader {
+func (l *Log) OpenReader(lastIndex uint64) Reader {
+	return l.openReader(lastIndex, false)
+}
+
+func (l *Log) OpenInMemReader(lastIndex uint64) Reader {
+	return l.openReader(lastIndex, true)
+}
+
+func (l *Log) openReader(lastIndex uint64, inMem bool) Reader {
 	l.lock.Lock()
 	defer l.lock.Unlock()
 
@@ -123,7 +161,11 @@ func (l *Log) OpenReader(lastIndex uint64) *Reader {
 
 		delete(l.subs, subId)
 	}
-	reader := NewReader(unsub, lastIndex+1, l.log)
+	newReader := NewReaderV2
+	if inMem {
+		newReader = NewInMemReader
+	}
+	reader := newReader(unsub, lastIndex+1, l.log)
 	l.subs[subId] = reader
 
 	return reader
@@ -141,10 +183,6 @@ func (l *Log) LastIndex() uint64 {
 	return l.index.Load()
 }
 
-func (l *Log) IsInMemory(index uint64) bool {
-	return l.log.IsInMemory(index)
-}
-
 func (l *Log) Close() error {
 	l.lock.Lock()
 	defer l.lock.Unlock()
@@ -157,7 +195,7 @@ func (l *Log) Close() error {
 	for _, reader := range l.subs {
 		reader.close()
 	}
-	l.subs = map[int32]*Reader{}
+	l.subs = map[int32]Reader{}
 
 	return nil
 }
@@ -178,8 +216,8 @@ func (l *Log) TruncateFront(newFirstIndex uint64) error {
 	return nil
 }
 
-func (l *Log) trySync(data []byte) (bool, error) {
-	l.writtenBytes += len(data)
+func (l *Log) trySync(bytesWritten int) (bool, error) {
+	l.writtenBytes += bytesWritten
 	if l.writtenBytes < l.fsyncThreshold {
 		return false, nil
 	}

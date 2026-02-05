@@ -2,8 +2,8 @@ package stream
 
 import (
 	"github.com/pkg/errors"
-	"github.com/txix-open/walx/pool"
-	"github.com/txix-open/walx/state"
+	"github.com/txix-open/walx/v2/pool"
+	"github.com/txix-open/walx/v2/state"
 )
 
 type Log interface {
@@ -13,20 +13,22 @@ type Log interface {
 type Writer struct {
 	log    Log
 	stream []byte
+	codec  state.Codec
 }
 
-func NewWriter(log Log, stream string) *Writer {
+func NewWriter(log Log, codec state.Codec, stream string) *Writer {
 	return &Writer{
 		log:    log,
 		stream: []byte(stream),
+		codec:  codec,
 	}
 }
 
-func (w *Writer) WriteMessage(msg any) error {
+func (w *Writer) WriteEvent(event any) error {
 	buff := pool.AcquireBuffer()
 	defer pool.ReleaseBuffer(buff)
 
-	err := state.PackEvent(w.stream, nil, msg, buff)
+	err := state.PackEvent(w.stream, nil, event, w.codec, buff)
 	if err != nil {
 		return errors.WithMessage(err, "pack event")
 	}

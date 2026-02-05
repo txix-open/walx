@@ -8,11 +8,16 @@ option go_package = "/replication/replicator";
 message BeginRequest {
   uint64 lastIndex = 1;
   repeated string filteredStreams = 2;
+  int32 limit = 3;
 }
 
 message Entry {
   bytes data = 1;
   uint64 index = 2;
+}
+
+message Entries {
+  repeated Entry entries = 1;
 }
 
 message WriteRequest {
@@ -24,6 +29,6 @@ message WriteResponse {
 }
 
 service Replicator {
-  rpc Begin(BeginRequest) returns (stream Entry);
+  rpc BeginReplication(BeginRequest) returns (stream Entries);
   rpc DebugWrite(WriteRequest) returns (WriteResponse);
 }

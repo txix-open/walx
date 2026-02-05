@@ -11,6 +11,7 @@ type clientOptions struct {
 	reconnectTimeout  time.Duration
 	logIntervalInTime time.Duration
 	logIntervalIndex  uint64
+	batchSize         int32
 	tls               *tls.Config
 }
 
@@ -19,6 +20,7 @@ func newClientOptions() *clientOptions {
 		reconnectTimeout:  1 * time.Second,
 		logIntervalInTime: 5 * time.Second,
 		logIntervalIndex:  500,
+		batchSize:         100,
 	}
 }
 
@@ -37,6 +39,12 @@ func LogIntervalInTime(t time.Duration) ClientOption {
 func LogIntervalIndex(logEveryEntries uint64) ClientOption {
 	return func(o *clientOptions) {
 		o.logIntervalIndex = logEveryEntries
+	}
+}
+
+func BatchSize(size int32) ClientOption {
+	return func(o *clientOptions) {
+		o.batchSize = size
 	}
 }
 
