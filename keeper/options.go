@@ -3,6 +3,8 @@ package keeper
 import (
 	"github.com/txix-open/walx/v2"
 	"github.com/txix-open/walx/v2/replication"
+	"github.com/txix-open/walx/v2/state"
+	"github.com/txix-open/walx/v2/state/codec/json"
 	"github.com/txix-open/walx/v2/stream"
 )
 
@@ -12,6 +14,7 @@ type options struct {
 	walOptions               []walx.Option
 	replicationClientOptions []replication.ClientOption
 	replicationServerOptions []replication.ServerOption
+	codec                    state.Codec
 }
 
 func newOptions() *options {
@@ -21,6 +24,7 @@ func newOptions() *options {
 		walOptions: []walx.Option{
 			walx.WithHook(metricsHook()),
 		},
+		codec: json.NewCodec(),
 	}
 }
 
@@ -53,5 +57,11 @@ func WithReplicationClientOptions(opts ...replication.ClientOption) Option {
 func WithReplicationServerOptions(opts ...replication.ServerOption) Option {
 	return func(o *options) {
 		o.replicationServerOptions = append(o.replicationServerOptions, opts...)
+	}
+}
+
+func WithCodec(codec state.Codec) Option {
+	return func(o *options) {
+		o.codec = codec
 	}
 }

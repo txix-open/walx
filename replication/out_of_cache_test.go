@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/txix-open/walx/v2/state/codec/json"
 	"github.com/txix-open/walx/v2/stream"
 
 	"github.com/stretchr/testify/require"
@@ -57,7 +58,7 @@ func TestOutOfCache(t *testing.T) {
 	t.Cleanup(func() {
 		_ = masterWal.Close()
 	})
-	s := state.New(masterWal, fsm{}, "test")
+	s := state.New(masterWal, fsm{}, json.NewCodec(), "test")
 	ctx := context.Background()
 	err = s.Recovery(ctx)
 	require.NoError(err)

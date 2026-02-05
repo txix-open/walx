@@ -50,7 +50,7 @@ func New(
 	}
 	logger.Info(ctx, "end reading wal")
 
-	ss := state.New(wal, businessState, name)
+	ss := state.New(wal, businessState, options.codec, name)
 	businessState.SetMutator(ss)
 
 	logger.Info(ctx, "start state recovering")
@@ -76,7 +76,7 @@ func (k *Keeper) State() *state.State {
 }
 
 func (k *Keeper) StreamWriter(streamName string) *stream.Writer {
-	return stream.NewWriter(k.state, streamName)
+	return stream.NewWriter(k.state, k.options.codec, streamName)
 }
 
 func (k *Keeper) StopReplication() {

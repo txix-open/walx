@@ -18,6 +18,7 @@ import (
 	"github.com/txix-open/isp-kit/log"
 	"github.com/txix-open/walx/v2"
 	"github.com/txix-open/walx/v2/state"
+	"github.com/txix-open/walx/v2/state/codec/json"
 )
 
 type SaveData struct {
@@ -90,7 +91,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	state := state.New(wal, controller, "test")
+	state := state.New(wal, controller, json.NewCodec(), "test")
 	defer state.Close()
 	err = state.Recovery(context.Background())
 	if err != nil {
