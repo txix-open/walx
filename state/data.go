@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/pkg/errors"
-	"github.com/txix-open/walx/state/enc"
+	"github.com/txix-open/walx/v2/state/enc"
 )
 
 const (

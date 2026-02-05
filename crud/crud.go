@@ -4,7 +4,7 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/txix-open/walx/state"
+	"github.com/txix-open/walx/v2/state"
 )
 
 var (

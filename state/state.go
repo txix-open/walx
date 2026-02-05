@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/txix-open/walx"
-	"github.com/txix-open/walx/pool"
+	"github.com/txix-open/walx/v2"
+	"github.com/txix-open/walx/v2/pool"
 )
 
 type Log struct {

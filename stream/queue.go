@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/txix-open/isp-kit/log"
 	"github.com/txix-open/wal"
-	"github.com/txix-open/walx"
+	"github.com/txix-open/walx/v2"
 )
 
 type Handler interface {

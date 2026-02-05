@@ -1,8 +1,8 @@
 package stream
 
 import (
-	"github.com/txix-open/walx"
-	"github.com/txix-open/walx/state"
+	"github.com/txix-open/walx/v2"
+	"github.com/txix-open/walx/v2/state"
 )
 
 const (

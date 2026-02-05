@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/txix-open/walx/stream"
+	"github.com/txix-open/walx/v2/stream"
 
 	"github.com/stretchr/testify/require"
 	"github.com/txix-open/isp-kit/log"
-	"github.com/txix-open/walx"
-	"github.com/txix-open/walx/replication"
-	"github.com/txix-open/walx/state"
+	"github.com/txix-open/walx/v2"
+	"github.com/txix-open/walx/v2/replication"
+	"github.com/txix-open/walx/v2/state"
 )
 
 type fsm struct {

@@ -11,8 +11,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/txix-open/isp-kit/log"
-	"github.com/txix-open/walx"
-	"github.com/txix-open/walx/replication/replicator"
+	"github.com/txix-open/walx/v2"
+	"github.com/txix-open/walx/v2/replication/replicator"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"

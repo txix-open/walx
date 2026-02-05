@@ -2,12 +2,12 @@ module walx/bench
 
 go 1.25
 
-replace github.com/txix-open/walx => ./..
+replace github.com/txix-open/walx/v2 => ./..
 
 require (
 	github.com/julienschmidt/httprouter v1.3.0
 	github.com/txix-open/isp-kit v1.64.10
-	github.com/txix-open/walx v0.0.0-00010101000000-000000000000
+	github.com/txix-open/walx/v2 v2.0.0-00010101000000-000000000000
 )
 
 require (

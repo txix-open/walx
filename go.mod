@@ -1,4 +1,4 @@
-module github.com/txix-open/walx
+module github.com/txix-open/walx/v2
 
 go 1.25
 

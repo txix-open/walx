@@ -10,11 +10,11 @@ import (
 	"github.com/txix-open/isp-kit/app"
 	"github.com/txix-open/isp-kit/log"
 	"github.com/txix-open/isp-kit/metrics"
-	"github.com/txix-open/walx"
-	"github.com/txix-open/walx/metric"
-	"github.com/txix-open/walx/replication"
-	"github.com/txix-open/walx/state"
-	"github.com/txix-open/walx/stream"
+	"github.com/txix-open/walx/v2"
+	"github.com/txix-open/walx/v2/metric"
+	"github.com/txix-open/walx/v2/replication"
+	"github.com/txix-open/walx/v2/state"
+	"github.com/txix-open/walx/v2/stream"
 	"golang.org/x/sync/errgroup"
 )
 

@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/txix-open/walx/metric"
+	"github.com/txix-open/walx/v2/metric"
 )
 
 func Test(t *testing.T) {

@@ -10,15 +10,15 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/txix-open/isp-kit/metrics"
-	"github.com/txix-open/walx/stream"
+	"github.com/txix-open/walx/v2/stream"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/peer"
 
 	"github.com/pkg/errors"
 	"github.com/txix-open/isp-kit/log"
 	"github.com/txix-open/isp-kit/requestid"
-	"github.com/txix-open/walx"
-	"github.com/txix-open/walx/replication/replicator"
+	"github.com/txix-open/walx/v2"
+	"github.com/txix-open/walx/v2/replication/replicator"
 	"google.golang.org/grpc"
 )
 
