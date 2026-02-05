@@ -1,4 +1,4 @@
-package enc_test
+package json_test
 
 import (
 	"fmt"

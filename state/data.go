@@ -6,24 +6,28 @@ import (
 	"io"
 
 	"github.com/pkg/errors"
-	"github.com/txix-open/walx/v2/state/enc"
 )
 
 const (
 	maxStreamNameSize = 255
 )
 
-func MarshalEvent(event any) ([]byte, error) {
+type Codec interface {
+	Encode(w io.Writer, event any) error
+	Decode(data []byte, eventPtr any) error
+}
+
+func MarshalEvent(codec Codec, event any) ([]byte, error) {
 	buff := bytes.NewBuffer(make([]byte, 0, 512))
-	err := EncodeEvent(buff, event)
+	err := EncodeEvent(codec, buff, event)
 	if err != nil {
 		return nil, err
 	}
 	return buff.Bytes(), nil
 }
 
-func EncodeEvent(w io.Writer, event any) error {
-	err := enc.EncodeInto(w, event)
+func EncodeEvent(codec Codec, w io.Writer, event any) error {
+	err := codec.Encode(w, event)
 	if err != nil {
 		return fmt.Errorf("json marshal: %w", err)
 	}
@@ -42,21 +46,21 @@ func UnmarshalEvent[T any](log Log) (T, error) {
 	}
 
 	var t T
-	err := enc.Unmarshal(log.serializedEvent, &t)
+	err := log.Unmarshal(&t)
 	if err != nil {
-		return t, fmt.Errorf("json unmarshal: %w", err)
+		return t, fmt.Errorf("unmarshal: %w", err)
 	}
 
 	return t, nil
 }
 
-func PackEvent(primaryStream []byte, streamSuffix []byte, event any, w io.Writer) error {
+func PackEvent(primaryStream []byte, streamSuffix []byte, event any, codec Codec, w io.Writer) error {
 	err := EncodeStreamData(primaryStream, streamSuffix, w)
 	if err != nil {
 		return err
 	}
 
-	err = EncodeEvent(w, event)
+	err = EncodeEvent(codec, w, event)
 	if err != nil {
 		return err
 	}

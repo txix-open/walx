@@ -10,17 +10,6 @@ import (
 	"github.com/txix-open/walx/v2/pool"
 )
 
-type Log struct {
-	serializedEvent []byte
-	event           any
-}
-
-func NewLog(serializedEvent []byte) Log {
-	return Log{
-		serializedEvent: serializedEvent,
-	}
-}
-
 type FSM interface {
 	Apply(log Log) (any, error)
 }
@@ -36,14 +25,16 @@ type BusinessState interface {
 
 type State struct {
 	*walx.Log
+	codec         Codec
 	fsm           FSM
 	futures       *sync.Map
 	primaryStream []byte
 }
 
-func New(log *walx.Log, fsm FSM, primaryStream string) *State {
+func New(log *walx.Log, fsm FSM, codec Codec, primaryStream string) *State {
 	return &State{
 		Log:           log,
+		codec:         codec,
 		fsm:           fsm,
 		futures:       &sync.Map{},
 		primaryStream: []byte(primaryStream),
@@ -70,7 +61,7 @@ func (s *State) Recovery(ctx context.Context) error {
 		}
 
 		streamName, data := UnpackEvent(entry.Data)
-		log := Log{serializedEvent: data}
+		log := NewLog(data, s.codec)
 		if MatchStream(streamName, s.primaryStream) {
 			_, _ = s.fsm.Apply(log)
 		}
@@ -81,7 +72,7 @@ func (s *State) Recovery(ctx context.Context) error {
 
 func (s *State) Apply(event any, streamSuffix []byte) (any, error) {
 	buff := pool.AcquireBuffer()
-	err := PackEvent(s.primaryStream, streamSuffix, event, buff)
+	err := PackEvent(s.primaryStream, streamSuffix, event, s.codec, buff)
 	if err != nil {
 		return nil, fmt.Errorf("pack event: %w", err)
 	}
@@ -120,7 +111,7 @@ func (s *State) Run(ctx context.Context) error {
 		featureValue, _ := s.futures.LoadAndDelete(entry.Index)
 		future, ok := featureValue.(*future)
 
-		log := NewLog(data)
+		log := NewLog(data, s.codec)
 		if ok && future.event != nil {
 			log.event = future.event
 		}
