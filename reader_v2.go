@@ -55,19 +55,7 @@ func (r *ReaderV2) Read(ctx context.Context) (Entry, error) {
 }
 
 func (r *ReaderV2) ReadAtMost(ctx context.Context, limit int) (Entries, error) {
-	result := make([]Entry, 0, limit/2)
-	for len(result) < limit {
-		shouldWait := len(result) == 0
-		entry, err := r.read(ctx, shouldWait)
-		if errors.Is(err, wal.ErrNotFound) {
-			return result, nil
-		}
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, entry)
-	}
-	return result, nil
+	return readAtMost(ctx, r, limit)
 }
 
 func (r *ReaderV2) read(ctx context.Context, wait bool) (Entry, error) {

@@ -243,8 +243,10 @@ func (s *State[T]) Apply(log state.Log) (any, error) {
 		return nil, state.ErrSkipApply
 	}
 
-	s.writeLock.Lock()
-	defer s.writeLock.Unlock()
+	if !log.IsInRecovery() {
+		s.writeLock.Lock()
+		defer s.writeLock.Unlock()
+	}
 
 	switch {
 	case req.UpsertRequest != nil:
