@@ -6,9 +6,9 @@ import (
 )
 
 func ReadMessage[T any](data []byte, codec state.Codec) (T, error) {
-	_, eventData := state.UnpackEvent(data)
+	streamName, eventData := state.UnpackEvent(data)
 
-	result, err := state.UnmarshalEvent[T](state.NewLog(eventData, codec))
+	result, err := state.UnmarshalEvent[T](state.NewLog(streamName, eventData, codec))
 	if err != nil {
 		return result, errors.WithMessage(err, "unmarshal event")
 	}
