@@ -28,7 +28,6 @@ type Queue struct {
 	handler     Handler
 	reader      walx.Reader
 	matcher     Matcher
-	batchSize   int
 	logger      log.Logger
 	closed      chan struct{}
 	shouldClose atomic.Bool
@@ -40,7 +39,6 @@ func New(
 	source Source,
 	handler Handler,
 	filteredStreams []string,
-	batchSize int,
 	logger log.Logger,
 ) *Queue {
 	reader := source.OpenReader(startFrom)
@@ -49,7 +47,6 @@ func New(
 		handler:     handler,
 		reader:      reader,
 		matcher:     NewMatcher(filteredStreams),
-		batchSize:   batchSize,
 		logger:      logger,
 		closed:      make(chan struct{}),
 		shouldClose: atomic.Bool{},
