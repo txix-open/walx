@@ -20,6 +20,7 @@ type Reader interface {
 	Read(ctx context.Context) (Entry, error)
 	ReadAtMost(ctx context.Context, limit int) (Entries, error)
 	Close()
+	LastIndex() uint64
 
 	notify()
 	close()
