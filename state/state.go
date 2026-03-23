@@ -20,7 +20,7 @@ type Mutator interface {
 
 type BusinessState interface {
 	FSM
-	SetMutator(state Mutator)
+	SetMutator(mutator Mutator)
 }
 
 type State struct {
@@ -61,7 +61,8 @@ func (s *State) Recovery(ctx context.Context) error {
 		}
 
 		streamName, data := UnpackEvent(entry.Data)
-		log := NewLog(data, s.codec)
+		log := NewLog(streamName, data, s.codec)
+		log.isInRecovery = true
 		if MatchStream(streamName, s.primaryStream) {
 			_, _ = s.fsm.Apply(log)
 		}
@@ -111,7 +112,7 @@ func (s *State) Run(ctx context.Context) error {
 		featureValue, _ := s.futures.LoadAndDelete(entry.Index)
 		future, ok := featureValue.(*future)
 
-		log := NewLog(data, s.codec)
+		log := NewLog(streamName, data, s.codec)
 		if ok && future.event != nil {
 			log.event = future.event
 		}
