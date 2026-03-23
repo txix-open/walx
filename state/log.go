@@ -31,3 +31,7 @@ func (l Log) IsInRecovery() bool {
 func (l Log) Unmarshal(eventPtr any) error {
 	return l.codec.Decode(l.serializedEvent, eventPtr)
 }
+
+func (l Log) SerializedEvent() []byte {
+	return l.serializedEvent
+}
