@@ -14,12 +14,12 @@ import (
 	"github.com/txix-open/walx/v2/state/codec/json"
 )
 
-func ServeState[T state.BusinessState](t *testing.T, s T) T {
+func ServeState[T state.BusinessState](t testing.TB, s T) T {
 	businessState, _ := ServeStateWithState(t, s, t.Name())
 	return businessState
 }
 
-func ServeStateWithState[T state.BusinessState](t *testing.T, s T, stateName string) (T, *state.State) {
+func ServeStateWithState[T state.BusinessState](t testing.TB, s T, stateName string) (T, *state.State) {
 	t.Helper()
 
 	require := require.New(t)

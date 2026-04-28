@@ -12,6 +12,10 @@ const (
 	maxStreamNameSize = 255
 )
 
+var (
+	Separator = []byte("/")
+)
+
 type Codec interface {
 	Encode(w io.Writer, event any) error
 	Decode(data []byte, eventPtr any) error
@@ -90,7 +94,7 @@ func EncodeStreamData(primaryStream []byte, streamSuffix []byte, w io.Writer) er
 		return err
 	}
 	if len(streamSuffix) > 0 {
-		_, err = w.Write([]byte{'/'})
+		_, err = w.Write(Separator)
 		if err != nil {
 			return err
 		}

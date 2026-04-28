@@ -1,8 +1,9 @@
 package crud_test
 
 import (
-	"github.com/txix-open/isp-kit/test/fake"
 	"testing"
+
+	"github.com/txix-open/isp-kit/test/fake"
 
 	"github.com/stretchr/testify/require"
 	"github.com/txix-open/walx/v2/crud"
