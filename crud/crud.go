@@ -26,7 +26,6 @@ type Hooks[T WithId] struct {
 type nothing struct{}
 
 type request[T WithId] struct {
-	State             string `json:"__state__"`
 	UpsertRequest     *T     `json:",omitempty"`
 	UpdateRequest     *T     `json:",omitempty"`
 	InsertRequest     *T     `json:",omitempty"`
@@ -40,23 +39,21 @@ type WithId interface {
 }
 
 type State[T WithId] struct {
-	mutator      state.Mutator
-	items        map[string]*T
-	name         string
-	streamSuffix []byte
-	hooks        Hooks[T]
-	readLock     sync.Locker
-	writeLock    sync.Locker
+	mutator   state.Mutator
+	items     map[string]*T
+	name      string
+	hooks     Hooks[T]
+	readLock  sync.Locker
+	writeLock sync.Locker
 }
 
 func New[T WithId](name string) *State[T] {
 	mu := &sync.RWMutex{}
 	return &State[T]{
-		name:         name,
-		streamSuffix: []byte(name),
-		items:        map[string]*T{},
-		readLock:     mu.RLocker(),
-		writeLock:    mu,
+		name:      name,
+		items:     map[string]*T{},
+		readLock:  mu.RLocker(),
+		writeLock: mu,
 	}
 }
 
@@ -105,10 +102,9 @@ func (s *State[T]) Get(id string) *T {
 }
 
 func (s *State[T]) Upsert(item T) error {
-	_, err := state.ApplyWithStreamSuffix[nothing](s.mutator, request[T]{
-		State:         s.name,
+	_, err := state.Apply[nothing](s.mutator, request[T]{
 		UpsertRequest: &item,
-	}, s.streamSuffix)
+	})
 	return err
 }
 
@@ -122,10 +118,9 @@ func (s *State[T]) upsert(item T) (any, error) {
 }
 
 func (s *State[T]) Delete(id string) (*T, error) {
-	val, err := state.ApplyWithStreamSuffix[T](s.mutator, request[T]{
-		State:         s.name,
+	val, err := state.Apply[T](s.mutator, request[T]{
 		DeleteRequest: id,
-	}, s.streamSuffix)
+	})
 	return val, err
 }
 
@@ -144,10 +139,9 @@ func (s *State[T]) delete(id string) (any, error) {
 }
 
 func (s *State[T]) DeleteAll() error {
-	_, err := state.ApplyWithStreamSuffix[nothing](s.mutator, request[T]{
-		State:            s.name,
+	_, err := state.Apply[nothing](s.mutator, request[T]{
 		DeleteAllRequest: true,
-	}, s.streamSuffix)
+	})
 	if err != nil {
 		return err
 	}
@@ -166,10 +160,9 @@ func (s *State[T]) deleteAll() (any, error) {
 }
 
 func (s *State[T]) Update(item T) error {
-	_, err := state.ApplyWithStreamSuffix[nothing](s.mutator, request[T]{
-		State:         s.name,
+	_, err := state.Apply[nothing](s.mutator, request[T]{
 		UpdateRequest: &item,
-	}, s.streamSuffix)
+	})
 	return err
 }
 
@@ -189,10 +182,9 @@ func (s *State[T]) update(item T) (any, error) {
 }
 
 func (s *State[T]) Insert(item T) error {
-	_, err := state.ApplyWithStreamSuffix[nothing](s.mutator, request[T]{
-		State:         s.name,
+	_, err := state.Apply[nothing](s.mutator, request[T]{
 		InsertRequest: &item,
-	}, s.streamSuffix)
+	})
 	return err
 }
 
@@ -212,10 +204,9 @@ func (s *State[T]) insert(item T) (any, error) {
 }
 
 func (s *State[T]) BulkUpsert(items []T) error {
-	_, err := state.ApplyWithStreamSuffix[nothing](s.mutator, request[T]{
-		State:             s.name,
+	_, err := state.Apply[nothing](s.mutator, request[T]{
 		BulkUpsertRequest: items,
-	}, s.streamSuffix)
+	})
 	return err
 }
 
@@ -238,9 +229,6 @@ func (s *State[T]) Apply(log state.Log) (any, error) {
 	req, err := state.UnmarshalEvent[request[T]](log)
 	if err != nil {
 		return nil, err
-	}
-	if req.State != s.name {
-		return nil, state.ErrSkipApply
 	}
 
 	if !log.IsInRecovery() {

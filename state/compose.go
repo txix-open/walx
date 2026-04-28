@@ -1,16 +1,10 @@
 package state
 
 import (
+	"bytes"
+
 	"github.com/pkg/errors"
-	"github.com/tidwall/gjson"
-)
-
-const (
-	NameField = "__state__"
-)
-
-var (
-	ErrSkipApply = errors.New("skip apply")
+	"github.com/txix-open/walx/v2/unsafe"
 )
 
 type NamedState interface {
@@ -18,39 +12,47 @@ type NamedState interface {
 	StateName() string
 }
 
+type mutatorWithPrefix struct {
+	delegate Mutator
+	prefix   []byte
+}
+
+func newMutatorWithPrefix(prefix []byte, delegate Mutator) mutatorWithPrefix {
+	return mutatorWithPrefix{
+		prefix:   prefix,
+		delegate: delegate,
+	}
+}
+
+func (m mutatorWithPrefix) Apply(event any, streamSuffix []byte) (any, error) {
+	streamSuffix = bytes.Join([][]byte{m.prefix, streamSuffix}, Separator)
+	return m.delegate.Apply(event, streamSuffix)
+}
+
 type composedFSM struct {
-	states      []NamedState
 	stateByName map[string]NamedState
 }
 
 func (c composedFSM) SetMutator(state Mutator) {
-	for _, fsm := range c.states {
-		fsm.SetMutator(state)
+	for name, fsm := range c.stateByName {
+		mutator := newMutatorWithPrefix([]byte(name), state)
+		fsm.SetMutator(mutator)
 	}
 }
 
 func (c composedFSM) Apply(log Log) (any, error) {
-	stateName := gjson.GetBytes(log.serializedEvent, NameField)
-	if stateName.Exists() {
-		state, ok := c.stateByName[stateName.Str]
-		if ok {
-			return state.Apply(log)
-		}
+	parts := bytes.SplitN(log.StreamName(), Separator, 3)
+	if len(parts) < 3 {
+		return nil, errors.New("invalid stream format. expected: streamPrefix/streamName")
 	}
 
-	//slow branch
-	for _, fsm := range c.states {
-		res, err := fsm.Apply(log)
-		if errors.Is(err, ErrSkipApply) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		return res, nil
+	state, ok := c.stateByName[unsafe.BytesToString(parts[1])]
+	if !ok {
+		return nil, errors.Errorf("fsm by prefix: '%s' not found", parts[1])
 	}
 
-	return nil, errors.New("fsm not found")
+	log.streamName = bytes.Join([][]byte{parts[0], parts[2]}, Separator)
+	return state.Apply(log)
 }
 
 func Compose(states ...NamedState) BusinessState {
@@ -59,7 +61,6 @@ func Compose(states ...NamedState) BusinessState {
 		stateByName[state.StateName()] = state
 	}
 	return composedFSM{
-		states:      states,
 		stateByName: stateByName,
 	}
 }

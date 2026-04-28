@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	require2 "github.com/stretchr/testify/require"
+	"github.com/txix-open/walx/v2/crud"
+	"github.com/txix-open/walx/v2/state"
 	"github.com/txix-open/walx/v2/state/sub"
 	"github.com/txix-open/walx/v2/tstate"
 )
@@ -48,22 +50,41 @@ func (s *StateExample) Get(key string) int {
 	return s.data[key]
 }
 
+func (s *StateExample) StateName() string {
+	return "state1"
+}
+
+type Item1 struct {
+	Id string
+	X  string
+}
+
+func (i Item1) GetId() string {
+	return i.Id
+}
+
 func TestSubState(t *testing.T) {
 	require := require2.New(t)
 
-	example := NewStateExample()
-	tstate.ServeState(t, example)
+	state1 := NewStateExample()
+	state2 := crud.New[Item1]("state2")
+	tstate.ServeState(t, state.Compose(state1, state2))
 
-	_, err := example.Inc("value1")
+	_, err := state1.Inc("value1")
 	require.NoError(err)
-	_, err = example.Inc("value1")
-	require.NoError(err)
-
-	_, err = example.Inc("value2")
+	_, err = state1.Inc("value1")
 	require.NoError(err)
 
-	value1 := example.Get("value1")
+	_, err = state1.Inc("value2")
+	require.NoError(err)
+
+	value1 := state1.Get("value1")
 	require.EqualValues(2, value1)
-	value2 := example.Get("value2")
+	value2 := state1.Get("value2")
 	require.EqualValues(1, value2)
+
+	err = state2.Upsert(Item1{"value1", "value2"})
+	require.NoError(err)
+	require.NotNil(state2.Get("value1"))
+
 }

@@ -2,20 +2,16 @@ package sub
 
 import (
 	"bytes"
-	"unsafe"
 
 	"github.com/pkg/errors"
 	"github.com/txix-open/walx/v2/state"
+	unsafe2 "github.com/txix-open/walx/v2/unsafe"
 )
 
 type State interface {
 	on(eventName string, handler handler)
 	getMutator() state.Mutator
 }
-
-var (
-	separator = []byte("/")
-)
 
 type handler struct {
 	handler func(log state.Log) (any, error)
@@ -31,12 +27,12 @@ func (s *Router) SetMutator(mutator state.Mutator) {
 }
 
 func (s *Router) Apply(log state.Log) (any, error) {
-	_, streamSuffix, found := bytes.Cut(log.StreamName(), separator)
+	_, streamSuffix, found := bytes.Cut(log.StreamName(), state.Separator)
 	if !found {
 		return nil, errors.New("invalid stream format. expected: streamName/streamSuffix")
 	}
 
-	eventName := byteToString(streamSuffix)
+	eventName := unsafe2.BytesToString(streamSuffix)
 	handler, ok := s.handlers[eventName]
 	if !ok {
 		return nil, errors.Errorf("unknown event: %s", eventName)
@@ -69,13 +65,5 @@ func On[T any](s State, eventName string, h func(payload T) (any, error)) {
 }
 
 func Emit[T any](s State, eventName string, payload any) (*T, error) {
-	return state.ApplyWithStreamSuffix[T](s.getMutator(), payload, stringToBytes(eventName))
-}
-
-func byteToString(b []byte) string {
-	return *(*string)(unsafe.Pointer(&b))
-}
-
-func stringToBytes(s string) []byte {
-	return unsafe.Slice(unsafe.StringData(s), len(s))
+	return state.ApplyWithStreamSuffix[T](s.getMutator(), payload, unsafe2.StringToBytes(eventName))
 }
