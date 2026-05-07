@@ -55,7 +55,7 @@ func (c composedFSM) Apply(log Log) (any, error) {
 	return state.Apply(log)
 }
 
-func Compose(states ...NamedState) BusinessState {
+func ComposeV2(states ...NamedState) BusinessState {
 	stateByName := make(map[string]NamedState)
 	for _, state := range states {
 		stateByName[state.StateName()] = state

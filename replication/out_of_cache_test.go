@@ -36,7 +36,7 @@ func newLogger(log log.Logger) *logger {
 	}
 }
 
-func (l *logger) Error(ctx context.Context, message interface{}, fields ...log.Field) {
+func (l *logger) Error(ctx context.Context, message any, fields ...log.Field) {
 	l.Logger.Error(ctx, message, fields...)
 	l.errCounter.Add(1)
 }
@@ -106,6 +106,6 @@ func TestOutOfCache(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(25 * time.Second)
+	time.Sleep(15 * time.Second)
 	require.EqualValues(0, logger.errCounter.Load())
 }

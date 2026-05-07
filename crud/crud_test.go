@@ -36,7 +36,7 @@ func TestState(t *testing.T) {
 	crud1 := crud.New[Item1]("crud1")
 	crud2 := crud.New[Item2]("crud2")
 
-	tstate.ServeState(t, state.Compose(crud1, crud2))
+	tstate.ServeState(t, state.ComposeV2(crud1, crud2))
 
 	err := crud1.Upsert(Item1{
 		Id: "1",

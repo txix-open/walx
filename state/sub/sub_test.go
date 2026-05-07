@@ -68,7 +68,7 @@ func TestSubState(t *testing.T) {
 
 	state1 := NewStateExample()
 	state2 := crud.New[Item1]("state2")
-	tstate.ServeState(t, state.Compose(state1, state2))
+	tstate.ServeState(t, state.ComposeV2(state1, state2))
 
 	_, err := state1.Inc("value1")
 	require.NoError(err)

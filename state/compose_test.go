@@ -27,7 +27,7 @@ func BenchmarkCompose(b *testing.B) {
 		s := crud.New[Item1](fmt.Sprintf("state_%d", i))
 		states = append(states, s)
 	}
-	tstate.ServeState(b, state.Compose(states...))
+	tstate.ServeState(b, state.ComposeV2(states...))
 
 	b.ReportAllocs()
 	b.ResetTimer()
