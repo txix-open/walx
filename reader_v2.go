@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"os"
 	"sync/atomic"
 	"time"
@@ -23,9 +24,9 @@ func (entries Entries) LastIndex() uint64 {
 }
 
 type ReaderV2 struct {
-	currentScanner *bufio.Scanner
-	currentFile    *atomic.Pointer[os.File]
-	isInMemory     bool
+	currentReader *PrefixSizeDataReader
+	currentFile   *atomic.Pointer[os.File]
+	isInMemory    bool
 
 	closed   *atomic.Bool
 	readTime *time.Timer
@@ -39,14 +40,14 @@ func NewReaderV2(unsub func(), index uint64, log *wal.Log) Reader {
 	i := &atomic.Uint64{}
 	i.Store(index)
 	return &ReaderV2{
-		unsub:          unsub,
-		currentFile:    &atomic.Pointer[os.File]{},
-		currentScanner: nil,
-		index:          i,
-		log:            log,
-		closed:         &atomic.Bool{},
-		readTime:       time.NewTimer(waitEntryTimeout),
-		ch:             make(chan struct{}),
+		unsub:         unsub,
+		currentFile:   &atomic.Pointer[os.File]{},
+		currentReader: nil,
+		index:         i,
+		log:           log,
+		closed:        &atomic.Bool{},
+		readTime:      time.NewTimer(waitEntryTimeout),
+		ch:            make(chan struct{}),
 	}
 }
 
@@ -93,23 +94,23 @@ func (r *ReaderV2) read(ctx context.Context, wait bool) (Entry, error) {
 		}
 	}
 
-	if r.currentScanner != nil {
-		ok := r.currentScanner.Scan()
-		if ok {
-			r.index.Add(1)
-			return Entry{
-				Data:  r.currentScanner.Bytes(),
-				Index: index,
-			}, nil
+	if r.currentReader != nil {
+		data, err := r.currentReader.ReadNext(false)
+		if errors.Is(err, io.EOF) {
+			_ = r.currentFile.Load().Close()
+			r.currentFile.Store(nil)
+			r.currentReader = nil
+			return r.read(ctx, wait)
 		}
-		err := r.currentScanner.Err()
 		if err != nil {
 			return Entry{}, errors.WithMessage(err, "scanner error")
 		}
 
-		_ = r.currentFile.Load().Close()
-		r.currentFile.Store(nil)
-		r.currentScanner = nil
+		r.index.Add(1)
+		return Entry{
+			Data:  data,
+			Index: index,
+		}, nil
 	}
 
 	r.isInMemory = r.log.IsInMemory(index)
@@ -123,19 +124,21 @@ func (r *ReaderV2) read(ctx context.Context, wait bool) (Entry, error) {
 		}
 		r.currentFile.Store(currentFile)
 
-		currentScanner := bufio.NewScanner(currentFile)
 		const buffSize = 64 * 1024 * 1024
-		currentScanner.Buffer(make([]byte, 0, buffSize), buffSize)
-		currentScanner.Split(LengthPrefixedSplitFunc)
-		r.currentScanner = currentScanner
+		buff := bufio.NewReaderSize(currentFile, buffSize)
+		currentReader := NewPrefixSizeDataReader(buff)
+		r.currentReader = currentReader
 
 		currentIndex := ss.FirstIndex()
 		for currentIndex < index {
-			_ = currentScanner.Scan()
-			err = currentScanner.Err()
-			if err != nil {
-				return Entry{}, errors.WithMessage(err, "scanner error")
+			_, err := currentReader.ReadNext(true)
+			if errors.Is(err, io.EOF) {
+				break
 			}
+			if err != nil {
+				return Entry{}, errors.WithMessagef(err, "read segment file: %s", ss.Path())
+			}
+			currentIndex++
 		}
 	}
 
@@ -171,20 +174,36 @@ func (r *ReaderV2) notify() {
 	}
 }
 
-func LengthPrefixedSplitFunc(data []byte, atEOF bool) (advance int, token []byte, err error) {
-	payloadLen, n := binary.Uvarint(data)
-	if n == 0 {
-		return 0, nil, nil
+type PrefixSizeDataReader struct {
+	r *bufio.Reader
+}
+
+func NewPrefixSizeDataReader(r *bufio.Reader) *PrefixSizeDataReader {
+	return &PrefixSizeDataReader{r: r}
+}
+
+func (r *PrefixSizeDataReader) ReadNext(skip bool) ([]byte, error) {
+	payloadLen, err := binary.ReadUvarint(r.r)
+	if errors.Is(err, io.ErrUnexpectedEOF) {
+		return nil, io.EOF
 	}
-	if n < 0 {
-		return 0, nil, errors.New("invalid data size")
+	if err != nil {
+		return nil, err
 	}
 
-	totalLen := n + int(payloadLen)
-
-	if len(data) < totalLen {
-		return 0, nil, nil
+	if skip {
+		_, err := r.r.Discard(int(payloadLen))
+		if err != nil {
+			return nil, err
+		}
+		return nil, nil
 	}
 
-	return totalLen, data[n:totalLen], nil
+	buf := make([]byte, payloadLen)
+	_, err = io.ReadFull(r.r, buf)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf, nil
 }
