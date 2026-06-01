@@ -9,7 +9,7 @@ require (
 	github.com/prometheus/client_golang v1.23.2
 	github.com/robfig/cron/v3 v3.0.1
 	github.com/stretchr/testify v1.11.1
-	github.com/txix-open/isp-kit v1.67.2
+	github.com/txix-open/isp-kit v1.68.0
 	github.com/txix-open/wal v1.4.0
 	golang.org/x/sync v0.20.0
 	google.golang.org/grpc v1.80.0

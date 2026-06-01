@@ -3,6 +3,8 @@ package replication
 import (
 	"crypto/tls"
 	"time"
+
+	"google.golang.org/grpc"
 )
 
 type ClientOption func(o *clientOptions)
@@ -13,6 +15,7 @@ type clientOptions struct {
 	logIntervalIndex  uint64
 	batchSize         int32
 	tls               *tls.Config
+	grpcDialOptions   []grpc.DialOption
 }
 
 func newClientOptions() *clientOptions {
@@ -51,5 +54,11 @@ func BatchSize(size int32) ClientOption {
 func ClientTls(cfg *tls.Config) ClientOption {
 	return func(o *clientOptions) {
 		o.tls = cfg
+	}
+}
+
+func GrpcDialOptions(opts ...grpc.DialOption) ClientOption {
+	return func(o *clientOptions) {
+		o.grpcDialOptions = append(o.grpcDialOptions, opts...)
 	}
 }
