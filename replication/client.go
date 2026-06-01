@@ -126,12 +126,13 @@ func (c *Client) begin(ctx context.Context) (replicator.Replicator_BeginReplicat
 	}
 	c.mu.Unlock()
 
-	var err error
 	dialCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
+
 	dialOpts := []grpc.DialOption{
 		grpc.WithBlock(),
 	}
+	dialOpts = append(dialOpts, c.options.grpcDialOptions...)
 	if c.options.tls != nil {
 		dialOpts = append(dialOpts, grpc.WithTransportCredentials(credentials.NewTLS(c.options.tls)))
 	} else {
@@ -139,6 +140,7 @@ func (c *Client) begin(ctx context.Context) (replicator.Replicator_BeginReplicat
 	}
 
 	c.mu.Lock()
+	var err error
 	c.grpcCli, err = grpc.DialContext(
 		dialCtx,
 		c.remoteAddr,

@@ -39,11 +39,14 @@ func NewServer(wal *walx.Log, log log.Logger, opts ...ServerOption) *Server {
 	for _, opt := range opts {
 		opt(options)
 	}
+
 	serverOpts := []grpc.ServerOption{}
+	serverOpts = append(serverOpts, options.grpcServerOptions...)
 	if options.tls != nil {
 		serverOpts = append(serverOpts, grpc.Creds(credentials.NewTLS(options.tls)))
 	}
 	srv := grpc.NewServer(serverOpts...)
+
 	s := &Server{
 		wal:         wal,
 		srv:         srv,

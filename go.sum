@@ -84,8 +84,8 @@ github.com/tidwall/tinylru v1.2.1 h1:VgBr72c2IEr+V+pCdkPZUwiQ0KJknnWIYbhxAVkYfQk
 github.com/tidwall/tinylru v1.2.1/go.mod h1:9bQnEduwB6inr2Y7AkBP7JPgCkyrhTV/ZpX0oOOpBI4=
 github.com/txix-open/bellows v1.2.0 h1:CXv8nQaZtB/micraeRilYyj/gtfv+bqBgP5aPYQgjeY=
 github.com/txix-open/bellows v1.2.0/go.mod h1:qbKCy+RTgD30Qpw1fyb3y3jp5Y9mGhLLxgae1l0W92o=
-github.com/txix-open/isp-kit v1.67.2 h1:ajSl90HJZF00e0lKtQSEIoFz8UUZH0g9YH10d5nDRkM=
-github.com/txix-open/isp-kit v1.67.2/go.mod h1:z1I1leRWhR3E+FqdOrf/+nyPXGfk4uEhD+x2lxXOxLY=
+github.com/txix-open/isp-kit v1.68.0 h1:uPBnunRDsYwPqnodc+4R7VpM5LPfp2Lsa94ZCBqmfQs=
+github.com/txix-open/isp-kit v1.68.0/go.mod h1:z1I1leRWhR3E+FqdOrf/+nyPXGfk4uEhD+x2lxXOxLY=
 github.com/txix-open/validator/v10 v10.0.0-20250506161033-f8ce404fffdb h1:UJgT4u/QMv5QHKOQeJ7igShHa36c2/vIRqJiRLdDlf0=
 github.com/txix-open/validator/v10 v10.0.0-20250506161033-f8ce404fffdb/go.mod h1:0biAFE0bgbcKeBBAwgEDhbZz6uT1vuSETCrFQlv2RiA=
 github.com/txix-open/wal v1.4.0 h1:6XDr8MsM5wB1XKYRVBtJvDL6q3MkBg+S86PuTOwW7Js=

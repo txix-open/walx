@@ -132,6 +132,7 @@ func (k *Keeper) Run(ctx context.Context) error {
 	})
 	group.Go(func() error {
 		if k.options.serverPort <= 0 {
+			k.logger.Info(ctx, "skip running wal replication server, server port is unspecified", log.String("state", k.name))
 			return nil
 		}
 
@@ -167,7 +168,7 @@ func (k *Keeper) Close() error {
 }
 
 func metricsHook() walx.Hook {
-	sizeMetric := metrics.GetOrRegister[prometheus.Summary](
+	sizeMetric := metrics.GetOrRegister(
 		metrics.DefaultRegistry,
 		prometheus.NewSummary(prometheus.SummaryOpts{
 			Name:       "wal_event_size",
@@ -175,7 +176,7 @@ func metricsHook() walx.Hook {
 			Objectives: metrics.DefaultObjectives,
 		}),
 	)
-	writeTimeMetric := metrics.GetOrRegister[prometheus.Summary](
+	writeTimeMetric := metrics.GetOrRegister(
 		metrics.DefaultRegistry,
 		prometheus.NewSummary(prometheus.SummaryOpts{
 			Name:       "wal_write_duration_ms",
@@ -183,7 +184,7 @@ func metricsHook() walx.Hook {
 			Objectives: metrics.DefaultObjectives,
 		}),
 	)
-	fsyncTimeMetric := metrics.GetOrRegister[prometheus.Summary](
+	fsyncTimeMetric := metrics.GetOrRegister(
 		metrics.DefaultRegistry,
 		prometheus.NewSummary(prometheus.SummaryOpts{
 			Name:       "wal_fsync_duration_ms",
