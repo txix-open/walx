@@ -8,9 +8,13 @@ import (
 	unsafe2 "github.com/txix-open/walx/v2/unsafe"
 )
 
+type Hook func(log state.Log, request any, result any, err error)
+
 type State interface {
 	on(eventName string, handler handler)
 	getMutator() state.Mutator
+
+	getHook() Hook
 }
 
 type handler struct {
@@ -20,6 +24,7 @@ type handler struct {
 type Router struct {
 	handlers map[string]handler
 	mutator  state.Mutator
+	hook     Hook
 }
 
 func (s *Router) SetMutator(mutator state.Mutator) {
@@ -41,6 +46,10 @@ func (s *Router) Apply(log state.Log) (any, error) {
 	return handler.handler(log)
 }
 
+func (s *Router) SetHook(hook Hook) {
+	s.hook = hook
+}
+
 func (s *Router) on(eventName string, h handler) {
 	if s.handlers == nil {
 		s.handlers = map[string]handler{}
@@ -52,13 +61,25 @@ func (s *Router) getMutator() state.Mutator {
 	return s.mutator
 }
 
+func (s *Router) getHook() Hook {
+	return s.hook
+}
+
 func On[T any](s State, eventName string, h func(payload T) (any, error)) {
 	ff := func(log state.Log) (any, error) {
-		payload, err := state.UnmarshalEvent[T](log)
+		request, err := state.UnmarshalEvent[T](log)
 		if err != nil {
 			return nil, errors.WithMessage(err, "unmarshal event")
 		}
-		return h(payload)
+
+		result, err := h(request)
+
+		hook := s.getHook()
+		if hook != nil {
+			hook(log, request, result, err)
+		}
+
+		return result, err
 	}
 	handler := handler{handler: ff}
 	s.on(eventName, handler)

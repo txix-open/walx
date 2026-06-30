@@ -2,6 +2,7 @@ package sub_test
 
 import (
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	require2 "github.com/stretchr/testify/require"
@@ -66,7 +67,12 @@ func (i Item1) GetId() string {
 func TestSubState(t *testing.T) {
 	require := require2.New(t)
 
+	hookCalled := atomic.Int32{}
+
 	state1 := NewStateExample()
+	state1.SetHook(func(log state.Log, request any, result any, err error) {
+		hookCalled.Add(1)
+	})
 	state2 := crud.New[Item1]("state2")
 	tstate.ServeState(t, state.ComposeV2(state1, state2))
 
@@ -87,4 +93,5 @@ func TestSubState(t *testing.T) {
 	require.NoError(err)
 	require.NotNil(state2.Get("value1"))
 
+	require.EqualValues(3, hookCalled.Load())
 }

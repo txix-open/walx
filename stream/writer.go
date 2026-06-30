@@ -24,11 +24,11 @@ func NewWriter(log Log, codec state.Codec, stream string) *Writer {
 	}
 }
 
-func (w *Writer) WriteEvent(event any) error {
+func (w *Writer) WriteEventWithSuffix(event any, suffix []byte) error {
 	buff := pool.AcquireBuffer()
 	defer pool.ReleaseBuffer(buff)
 
-	err := state.PackEvent(w.stream, nil, event, w.codec, buff)
+	err := state.PackEvent(w.stream, suffix, event, w.codec, buff)
 	if err != nil {
 		return errors.WithMessage(err, "pack event")
 	}
@@ -39,6 +39,10 @@ func (w *Writer) WriteEvent(event any) error {
 	}
 
 	return nil
+}
+
+func (w *Writer) WriteEvent(event any, suffix []byte) error {
+	return w.WriteEventWithSuffix(event, nil)
 }
 
 func (w *Writer) WriteData(data []byte) error {
