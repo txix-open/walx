@@ -30,10 +30,10 @@ func BenchmarkCompose(b *testing.B) {
 	tstate.ServeState(b, state.ComposeV2(states...))
 
 	b.ReportAllocs()
-	b.ResetTimer()
+
 	s := states[0].(*crud.State[Item1])
 	value := fake.It[Item1]()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		err := s.Upsert(value)
 		require.NoError(err)
 	}
