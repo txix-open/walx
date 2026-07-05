@@ -180,7 +180,7 @@ func metricsHook() walx.Hook {
 		metrics.DefaultRegistry,
 		prometheus.NewSummary(prometheus.SummaryOpts{
 			Name:       "wal_write_duration_ms",
-			Help:       "Time to write event in milliseconds to WAL",
+			Help:       "Time to write event in nanoseconds to WAL",
 			Objectives: metrics.DefaultObjectives,
 		}),
 	)

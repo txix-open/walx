@@ -32,12 +32,12 @@ func (s *Router) SetMutator(mutator state.Mutator) {
 }
 
 func (s *Router) Apply(log state.Log) (any, error) {
-	_, streamSuffix, found := bytes.Cut(log.StreamName(), state.Separator)
-	if !found {
+	streamName := log.StreamName()
+	sep := bytes.IndexByte(streamName, state.Separator)
+	if sep < 0 {
 		return nil, errors.New("invalid stream format. expected: streamName/streamSuffix")
 	}
-
-	eventName := unsafe2.BytesToString(streamSuffix)
+	eventName := unsafe2.BytesToString(streamName[sep+1:])
 	handler, ok := s.handlers[eventName]
 	if !ok {
 		return nil, errors.Errorf("unknown event: %s", eventName)
