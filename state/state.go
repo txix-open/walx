@@ -23,22 +23,34 @@ type BusinessState interface {
 	SetMutator(mutator Mutator)
 }
 
+type primaryStreamSetter interface {
+	SetPrimaryStream([]byte)
+}
+
 type State struct {
 	*walx.Log
 	codec         Codec
 	fsm           FSM
 	futures       *sync.Map
 	primaryStream []byte
+	logPool       sync.Pool
 }
 
 func New(log *walx.Log, fsm FSM, codec Codec, primaryStream string) *State {
-	return &State{
+	s := &State{
 		Log:           log,
 		codec:         codec,
 		fsm:           fsm,
 		futures:       &sync.Map{},
 		primaryStream: []byte(primaryStream),
+		logPool: sync.Pool{
+			New: func() any { return &Log{} },
+		},
 	}
+	if pss, ok := fsm.(primaryStreamSetter); ok {
+		pss.SetPrimaryStream(s.primaryStream)
+	}
+	return s
 }
 
 func (s *State) Recovery(ctx context.Context) error {
@@ -54,6 +66,9 @@ func (s *State) Recovery(ctx context.Context) error {
 	defer reader.Close()
 
 	lastIndex := s.Log.LastIndex()
+	log := Log{}
+	log.isInRecovery = true
+	log.codec = s.codec
 	for i := firstIdx; i < lastIndex; i++ {
 		entry, err := reader.Read(ctx)
 		if err != nil {
@@ -61,11 +76,15 @@ func (s *State) Recovery(ctx context.Context) error {
 		}
 
 		streamName, data := UnpackEvent(entry.Data)
-		log := NewLog(streamName, data, s.codec)
-		log.isInRecovery = true
-		if MatchStream(streamName, s.primaryStream) {
-			_, _ = s.fsm.Apply(log)
+		if !MatchStream(streamName, s.primaryStream) {
+			continue
 		}
+
+		log.streamName = streamName
+		log.serializedEvent = data
+		_, _ = s.fsm.Apply(log)
+		log.streamName = nil
+		log.serializedEvent = nil
 	}
 
 	return nil
@@ -78,7 +97,7 @@ func (s *State) Apply(event any, streamSuffix []byte) (any, error) {
 		return nil, fmt.Errorf("pack event: %w", err)
 	}
 
-	future := newFuture(event)
+	future := acquireFuture(event)
 	_, err = s.Log.Write(buff.Bytes(), func(index uint64) {
 		s.futures.Store(index, future)
 	})
@@ -87,7 +106,9 @@ func (s *State) Apply(event any, streamSuffix []byte) (any, error) {
 	}
 	pool.ReleaseBuffer(buff)
 
-	return future.wait()
+	res, err := future.wait()
+	releaseFuture(future)
+	return res, err
 }
 
 func (s *State) Run(ctx context.Context) error {

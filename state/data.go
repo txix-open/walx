@@ -12,22 +12,18 @@ const (
 	maxStreamNameSize = 255
 )
 
-var (
-	Separator = []byte("/")
+type Writer interface {
+	io.Writer
+	WriteByte(b byte) error
+}
+
+const (
+	Separator = byte('/')
 )
 
 type Codec interface {
 	Encode(w io.Writer, event any) error
 	Decode(data []byte, eventPtr any) error
-}
-
-func MarshalEvent(codec Codec, event any) ([]byte, error) {
-	buff := bytes.NewBuffer(make([]byte, 0, 512))
-	err := EncodeEvent(codec, buff, event)
-	if err != nil {
-		return nil, err
-	}
-	return buff.Bytes(), nil
 }
 
 func EncodeEvent(codec Codec, w io.Writer, event any) error {
@@ -58,7 +54,7 @@ func UnmarshalEvent[T any](log Log) (T, error) {
 	return t, nil
 }
 
-func PackEvent(primaryStream []byte, streamSuffix []byte, event any, codec Codec, w io.Writer) error {
+func PackEvent(primaryStream []byte, streamSuffix []byte, event any, codec Codec, w Writer) error {
 	err := EncodeStreamData(primaryStream, streamSuffix, w)
 	if err != nil {
 		return err
@@ -72,7 +68,7 @@ func PackEvent(primaryStream []byte, streamSuffix []byte, event any, codec Codec
 	return nil
 }
 
-func EncodeStreamData(primaryStream []byte, streamSuffix []byte, w io.Writer) error {
+func EncodeStreamData(primaryStream []byte, streamSuffix []byte, w Writer) error {
 	if len(primaryStream) == 0 {
 		return errors.New("primaryStream is required")
 	}
@@ -85,7 +81,7 @@ func EncodeStreamData(primaryStream []byte, streamSuffix []byte, w io.Writer) er
 		return errors.Errorf("full stream name is too long, max streamNameSize = %d", maxStreamNameSize)
 	}
 
-	_, err := w.Write([]byte{byte(streamNameSize)})
+	err := w.WriteByte(byte(streamNameSize))
 	if err != nil {
 		return err
 	}
@@ -94,7 +90,7 @@ func EncodeStreamData(primaryStream []byte, streamSuffix []byte, w io.Writer) er
 		return err
 	}
 	if len(streamSuffix) > 0 {
-		_, err = w.Write(Separator)
+		err = w.WriteByte(Separator)
 		if err != nil {
 			return err
 		}
