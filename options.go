@@ -11,7 +11,6 @@ const (
 )
 
 type HookData struct {
-	LastIndex    uint64
 	BytesWritten int
 	WriteTime    time.Duration
 	FSyncCalled  bool
