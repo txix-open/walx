@@ -31,9 +31,9 @@ type State struct {
 	*walx.Log
 	codec         Codec
 	fsm           FSM
-	futures       *sync.Map
+	futures       map[uint64]*future
+	futuresLock   sync.Locker
 	primaryStream []byte
-	logPool       sync.Pool
 }
 
 func New(log *walx.Log, fsm FSM, codec Codec, primaryStream string) *State {
@@ -41,11 +41,9 @@ func New(log *walx.Log, fsm FSM, codec Codec, primaryStream string) *State {
 		Log:           log,
 		codec:         codec,
 		fsm:           fsm,
-		futures:       &sync.Map{},
+		futures:       make(map[uint64]*future, 10),
+		futuresLock:   &sync.Mutex{},
 		primaryStream: []byte(primaryStream),
-		logPool: sync.Pool{
-			New: func() any { return &Log{} },
-		},
 	}
 	if pss, ok := fsm.(primaryStreamSetter); ok {
 		pss.SetPrimaryStream(s.primaryStream)
@@ -99,7 +97,9 @@ func (s *State) Apply(event any, streamSuffix []byte) (any, error) {
 
 	future := acquireFuture(event)
 	_, err = s.Log.Write(buff.Bytes(), func(index uint64) {
-		s.futures.Store(index, future)
+		s.futuresLock.Lock()
+		s.futures[index] = future
+		s.futuresLock.Unlock()
 	})
 	if err != nil {
 		return nil, fmt.Errorf("write: %w", err)
@@ -130,8 +130,10 @@ func (s *State) Run(ctx context.Context) error {
 			continue
 		}
 
-		featureValue, _ := s.futures.LoadAndDelete(entry.Index)
-		future, ok := featureValue.(*future)
+		s.futuresLock.Lock()
+		future, ok := s.futures[entry.Index]
+		delete(s.futures, entry.Index)
+		s.futuresLock.Unlock()
 
 		log := NewLog(streamName, data, s.codec)
 		if ok && future.event != nil {
@@ -152,13 +154,11 @@ func (s *State) Close() error {
 		return err
 	}
 
-	s.futures.Range(func(key, value any) bool {
-		completer, ok := value.(*future)
-		if ok {
-			completer.complete(nil, errors.New("state close"))
-		}
-		return true
-	})
+	s.futuresLock.Lock()
+	for _, future := range s.futures {
+		future.complete(nil, errors.New("state close"))
+	}
+	s.futuresLock.Unlock()
 
 	return nil
 }
