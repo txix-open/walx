@@ -41,7 +41,7 @@ func (w *Writer) WriteEventWithSuffix(event any, suffix []byte) error {
 	return nil
 }
 
-func (w *Writer) WriteEvent(event any, suffix []byte) error {
+func (w *Writer) WriteEvent(event any) error {
 	return w.WriteEventWithSuffix(event, nil)
 }
 
