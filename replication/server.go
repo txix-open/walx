@@ -22,6 +22,8 @@ import (
 	"google.golang.org/grpc"
 )
 
+const overhead = 32
+
 type Server struct {
 	replicator.UnimplementedReplicatorServer
 	wal     *walx.Log
@@ -30,11 +32,15 @@ type Server struct {
 	logger  log.Logger
 
 	cancelFuncs   map[string]context.CancelFunc
-	mu            sync.Mutex
+	lock          sync.Mutex
 	indexLagGauge *prometheus.GaugeVec
 }
 
-func NewServer(wal *walx.Log, log log.Logger, opts ...ServerOption) *Server {
+func NewServer(
+	wal *walx.Log,
+	log log.Logger,
+	opts ...ServerOption,
+) *Server {
 	options := newServerOptions()
 	for _, opt := range opts {
 		opt(options)
@@ -45,6 +51,10 @@ func NewServer(wal *walx.Log, log log.Logger, opts ...ServerOption) *Server {
 	if options.tls != nil {
 		serverOpts = append(serverOpts, grpc.Creds(credentials.NewTLS(options.tls)))
 	}
+	serverOpts = append(serverOpts,
+		grpc.MaxRecvMsgSize(options.maxMessageSizeBytes),
+		grpc.MaxSendMsgSize(options.maxMessageSizeBytes),
+	)
 	srv := grpc.NewServer(serverOpts...)
 
 	s := &Server{
@@ -53,7 +63,7 @@ func NewServer(wal *walx.Log, log log.Logger, opts ...ServerOption) *Server {
 		options:     options,
 		logger:      log,
 		cancelFuncs: make(map[string]context.CancelFunc),
-		mu:          sync.Mutex{},
+		lock:        sync.Mutex{},
 		indexLagGauge: metrics.GetOrRegister(metrics.DefaultRegistry, prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Subsystem:   "wal",
 			Name:        "index_lag",
@@ -70,14 +80,14 @@ func (s *Server) BeginReplication(request *replicator.BeginRequest, server repli
 	ctx := log.ToContext(server.Context(), log.String("clientId", clientId))
 	ctx, cancel := context.WithCancel(ctx)
 	defer func() {
-		s.mu.Lock()
+		s.lock.Lock()
 		cancel()
 		delete(s.cancelFuncs, clientId)
-		s.mu.Unlock()
+		s.lock.Unlock()
 	}()
-	s.mu.Lock()
+	s.lock.Lock()
 	s.cancelFuncs[clientId] = cancel
-	s.mu.Unlock()
+	s.lock.Unlock()
 
 	s.logger.Info(
 		ctx,
@@ -131,25 +141,34 @@ func (s *Server) BeginReplication(request *replicator.BeginRequest, server repli
 		s.logIndexLag(ctx, gauge, s.wal.LastIndex(), entries.LastIndex(), clientIp)
 
 		toSend = toSend[:0]
+		var bytesInBatch int
+		maxSize := s.options.maxMessageSizeBytes
 		for _, entry := range entries {
 			entryData := emptyData
 			if matcher.Match(entry) {
 				entryData = entry.Data
 			}
+			entrySize := len(entryData) + overhead
+
+			if bytesInBatch+entrySize > maxSize && len(toSend) > 0 {
+				err = s.sendEntries(server, toSend)
+				if err != nil {
+					return errors.WithMessage(err, "send log entries before split")
+				}
+				toSend = toSend[:0]
+				bytesInBatch = 0
+			}
+
 			toSend = append(toSend, &replicator.Entry{
 				Data:  entryData,
 				Index: entry.Index,
 			})
+			bytesInBatch += entrySize
 		}
 
-		err = server.Send(&replicator.Entries{
-			Entries: toSend,
-		})
-		if errors.Is(err, io.EOF) {
-			return nil
-		}
+		err = s.sendEntries(server, toSend)
 		if err != nil {
-			return errors.WithMessage(err, "send log entry")
+			return errors.WithMessage(err, "send log entries")
 		}
 	}
 }
@@ -162,6 +181,23 @@ func (s *Server) DebugWrite(ctx context.Context, request *replicator.WriteReques
 		return nil, errors.WithMessage(err, "write debug message")
 	}
 	return &replicator.WriteResponse{Index: index}, nil
+}
+
+func (s *Server) sendEntries(
+	server replicator.Replicator_BeginReplicationServer,
+	entries []*replicator.Entry,
+) error {
+	if len(entries) == 0 {
+		return nil
+	}
+	err := server.Send(&replicator.Entries{Entries: entries})
+	if errors.Is(err, io.EOF) {
+		return nil
+	}
+	if err != nil {
+		return errors.WithMessage(err, "send log entries")
+	}
+	return nil
 }
 
 func (s *Server) ListenAndServe(addr string) error {
@@ -178,11 +214,11 @@ func (s *Server) Serve(lis net.Listener) error {
 }
 
 func (s *Server) Close() error {
-	s.mu.Lock()
+	s.lock.Lock()
 	for _, cancel := range s.cancelFuncs {
 		cancel()
 	}
-	s.mu.Unlock()
+	s.lock.Unlock()
 	s.srv.GracefulStop()
 	return nil
 }

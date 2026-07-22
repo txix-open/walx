@@ -6,16 +6,31 @@ import (
 	"google.golang.org/grpc"
 )
 
+const (
+	mb                         = 1024 * 1024
+	DefaultMaxMessageSizeBytes = 64 * mb
+)
+
 type ServerOption func(opts *serverOptions)
 
 type serverOptions struct {
-	tls               *tls.Config
-	minIndexLagToLog  int64
-	grpcServerOptions []grpc.ServerOption
+	maxMessageSizeBytes int
+	tls                 *tls.Config
+	minIndexLagToLog    int64
+	grpcServerOptions   []grpc.ServerOption
 }
 
 func newServerOptions() *serverOptions {
-	return &serverOptions{minIndexLagToLog: 100_000}
+	return &serverOptions{
+		maxMessageSizeBytes: DefaultMaxMessageSizeBytes,
+		minIndexLagToLog:    100_000,
+	}
+}
+
+func ServerMaxMessageSize(maxBytesSize int) ServerOption {
+	return func(opts *serverOptions) {
+		opts.maxMessageSizeBytes = maxBytesSize
+	}
 }
 
 func ServerTls(cfg *tls.Config) ServerOption {
