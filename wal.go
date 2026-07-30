@@ -85,63 +85,31 @@ func (l *Log) Write(data []byte, nextIndex func(index uint64)) (uint64, error) {
 	return next, nil
 }
 
+func (l *Log) WriteBatch(data [][]byte) error {
+	if len(data) == 0 {
+		return nil
+	}
+
+	l.lock.Lock()
+	// writeEntries will call unlock
+
+	next := l.index.Load() + 1
+	entries := make(Entries, 0, len(data))
+	for offset, b := range data {
+		entries = append(entries, Entry{
+			Data:  b,
+			Index: next + uint64(offset),
+		})
+	}
+
+	return l.writeEntries(entries, false)
+}
+
 func (l *Log) WriteEntries(entries Entries) error {
 	if len(entries) == 0 {
 		return nil
 	}
-
-	var hookData HookData
-	l.lock.Lock()
-	defer func() {
-		l.batch.Clear()
-		l.lock.Unlock()
-
-		l.options.hook(hookData)
-		l.readers.Notify()
-	}()
-
-	lastIndex := entries.LastIndex()
-
-	bytesWritten := 0
-	for _, entry := range entries {
-		l.batch.Write(entry.Index, entry.Data)
-		bytesWritten += len(entry.Data)
-	}
-
-	startWrite := time.Now()
-	err := l.log.WriteBatch(l.batch)
-	if err != nil {
-		return fmt.Errorf("write batch: %w", err)
-	}
-	writeTime := time.Since(startWrite)
-
-	hookData, err = l.postWrite(bytesWritten, writeTime, lastIndex)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-func (l *Log) postWrite(bytesWritten int, writeTime time.Duration, index uint64) (HookData, error) {
-	startFsync := time.Now()
-	var fsyncTime time.Duration
-	fsyncCalled, err := l.trySync(bytesWritten)
-	if err != nil {
-		return HookData{}, err
-	}
-
-	l.index.Store(index)
-
-	if fsyncCalled {
-		fsyncTime = time.Since(startFsync)
-	}
-
-	return HookData{
-		BytesWritten: bytesWritten,
-		WriteTime:    writeTime,
-		FSyncCalled:  fsyncCalled,
-		FSyncTime:    fsyncTime,
-	}, nil
+	return l.writeEntries(entries, true)
 }
 
 func (l *Log) OpenReader(lastIndex uint64) Reader {
@@ -196,6 +164,64 @@ func (l *Log) TruncateFront(newFirstIndex uint64) error {
 	}
 	l.index.Store(index)
 	return nil
+}
+
+func (l *Log) writeEntries(entries Entries, shouldLock bool) error {
+	var hookData HookData
+	if shouldLock {
+		l.lock.Lock()
+	}
+	defer func() {
+		l.batch.Clear()
+		l.lock.Unlock()
+
+		l.options.hook(hookData)
+		l.readers.Notify()
+	}()
+
+	lastIndex := entries.LastIndex()
+
+	bytesWritten := 0
+	for _, entry := range entries {
+		l.batch.Write(entry.Index, entry.Data)
+		bytesWritten += len(entry.Data)
+	}
+
+	startWrite := time.Now()
+	err := l.log.WriteBatch(l.batch)
+	if err != nil {
+		return fmt.Errorf("write batch: %w", err)
+	}
+	writeTime := time.Since(startWrite)
+
+	hookData, err = l.postWrite(bytesWritten, writeTime, lastIndex)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (l *Log) postWrite(bytesWritten int, writeTime time.Duration, index uint64) (HookData, error) {
+	startFsync := time.Now()
+	var fsyncTime time.Duration
+	fsyncCalled, err := l.trySync(bytesWritten)
+	if err != nil {
+		return HookData{}, err
+	}
+
+	l.index.Store(index)
+
+	if fsyncCalled {
+		fsyncTime = time.Since(startFsync)
+	}
+
+	return HookData{
+		BytesWritten: bytesWritten,
+		WriteTime:    writeTime,
+		FSyncCalled:  fsyncCalled,
+		FSyncTime:    fsyncTime,
+	}, nil
 }
 
 func (l *Log) trySync(bytesWritten int) (bool, error) {
